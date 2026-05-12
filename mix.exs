@@ -1,0 +1,87 @@
+defmodule Spek.MixProject do
+  use Mix.Project
+
+  @source_url "https://github.com/woylie/spek"
+  @version "0.1.0"
+
+  def project do
+    [
+      app: :spek,
+      version: @version,
+      elixir: "~> 1.19",
+      start_permanent: Mix.env() == :prod,
+      elixirc_paths: elixirc_paths(Mix.env()),
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls],
+      dialyzer: [
+        plt_file: {:no_warn, ".plts/dialyzer.plt"}
+      ],
+      name: "Spek",
+      source_url: @source_url,
+      homepage_url: @source_url,
+      description: description(),
+      package: package(),
+      docs: docs()
+    ]
+  end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.github": :test
+      ]
+    ]
+  end
+
+  # Run "mix help compile.app" to learn about applications.
+  def application do
+    [
+      extra_applications: [:logger]
+    ]
+  end
+
+  # Run "mix help deps" to learn about dependencies.
+  defp deps do
+    [
+      {:credo, "== 1.7.17", only: [:dev, :test], runtime: false},
+      {:dialyxir, "1.4.7", only: [:dev, :test], runtime: false},
+      {:ex_doc, "0.40.1", only: :dev, runtime: false},
+      {:excoveralls, "0.18.5", only: :test}
+    ]
+  end
+
+  defp description do
+    "Business rule evaluator and optimizer"
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => @source_url <> "/blob/main/CHANGELOG.md",
+        "Sponsor" => "https://github.com/sponsors/woylie"
+      },
+      files: ~w(lib .formatter.exs mix.exs README* LICENSE* CHANGELOG*)
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      extras: ["README.md", "CHANGELOG.md"],
+      source_ref: @version,
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
+      groups_for_extras: [
+        Cheatsheets: ~r/cheatsheets\/.?/
+      ]
+    ]
+  end
+end
