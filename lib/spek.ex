@@ -302,9 +302,10 @@ defmodule Spek do
     ])
   end
 
-  defp to_boolean(bool) when is_boolean(bool), do: bool
-  defp to_boolean(:ok), do: true
-  defp to_boolean({:ok, _}), do: true
-  defp to_boolean(:error), do: false
-  defp to_boolean({:error, _}), do: false
+  @doc false
+  def to_boolean(bool) when is_boolean(bool), do: bool
+  def to_boolean(:ok), do: true
+  def to_boolean({:ok, _}), do: true
+  def to_boolean(:error), do: false
+  def to_boolean({:error, _}), do: false
 end
