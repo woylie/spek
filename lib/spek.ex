@@ -302,9 +302,137 @@ defmodule Spek do
     ])
   end
 
-  defp to_boolean(bool) when is_boolean(bool), do: bool
-  defp to_boolean(:ok), do: true
-  defp to_boolean({:ok, _}), do: true
-  defp to_boolean(:error), do: false
-  defp to_boolean({:error, _}), do: false
+  ## Evaluation
+
+  @doc """
+  Lazily evaluates the given expression and returns the result as a boolean.
+  """
+  @spec eval?(expression, term) :: boolean
+  def eval?(expr, context \\ [])
+
+  def eval?(%Literal{satisfied?: satisfied?}, _) do
+    satisfied?
+  end
+
+  def eval?(
+        %Check{module: module, fun: fun, args: args},
+        context
+      ) do
+    module
+    |> apply(fun, replace_args(args, context))
+    |> Spek.to_boolean()
+  end
+
+  def eval?(%Not{expression: expression}, context) do
+    not eval?(expression, context)
+  end
+
+  def eval?(%And{children: children}, context) do
+    Enum.all?(children, &eval?(&1, context))
+  end
+
+  def eval?(%Or{children: children}, context) do
+    Enum.any?(children, &eval?(&1, context))
+  end
+
+  @doc """
+  Lazily evaluates the given expression and the evaluated expressions until a
+  decision was made.
+  """
+  @spec eval_tree(expression, term) :: expression
+  def eval_tree(expr, context \\ [])
+
+  def eval_tree(%Literal{} = literal, _) do
+    literal
+  end
+
+  def eval_tree(
+        %Check{module: module, fun: fun, args: args} = check,
+        context
+      ) do
+    result = apply(module, fun, replace_args(args, context))
+    %{check | result: result, satisfied?: Spek.to_boolean(result)}
+  end
+
+  def eval_tree(
+        %Not{expression: expression} = not_expr,
+        context
+      ) do
+    evaluated_expression =
+      eval_tree(expression, context)
+
+    %{
+      not_expr
+      | expression: evaluated_expression,
+        satisfied?: not evaluated_expression.satisfied?
+    }
+  end
+
+  def eval_tree(
+        %And{children: children} = and_,
+        context
+      ) do
+    {satisfied?, evaluated_children} =
+      Enum.reduce_while(
+        children,
+        {true, []},
+        &and_reducer(&1, &2, context)
+      )
+
+    %{and_ | satisfied?: satisfied?, children: Enum.reverse(evaluated_children)}
+  end
+
+  def eval_tree(
+        %Or{children: children} = or_,
+        context
+      ) do
+    {satisfied?, evaluated_children} =
+      Enum.reduce_while(
+        children,
+        {false, []},
+        &any_of_reducer(&1, &2, context)
+      )
+
+    %{or_ | satisfied?: satisfied?, children: Enum.reverse(evaluated_children)}
+  end
+
+  defp and_reducer(expression, {_, acc}, context) do
+    case eval_tree(expression, context) do
+      %{satisfied?: true} = expr -> {:cont, {true, [expr | acc]}}
+      %{satisfied?: false} = expr -> {:halt, {false, [expr | acc]}}
+    end
+  end
+
+  defp any_of_reducer(expression, {_, acc}, context) do
+    case eval_tree(expression, context) do
+      %{satisfied?: true} = expr -> {:halt, {true, [expr | acc]}}
+      %{satisfied?: false} = expr -> {:cont, {false, [expr | acc]}}
+    end
+  end
+
+  defp replace_args([], _), do: []
+
+  defp replace_args(args, context) do
+    Enum.map(args, &replace_arg(&1, context))
+  end
+
+  defp replace_arg(:ctx, context), do: context
+
+  defp replace_arg({:ctx, key}, context)
+       when is_atom(key) and is_map(context) do
+    Map.fetch!(context, key)
+  end
+
+  defp replace_arg({:ctx, key}, context) when is_list(context) do
+    Keyword.fetch!(context, key)
+  end
+
+  defp replace_arg(arg, _), do: arg
+
+  @doc false
+  def to_boolean(bool) when is_boolean(bool), do: bool
+  def to_boolean(:ok), do: true
+  def to_boolean({:ok, _}), do: true
+  def to_boolean(:error), do: false
+  def to_boolean({:error, _}), do: false
 end
