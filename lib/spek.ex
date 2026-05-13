@@ -5,6 +5,7 @@ defmodule Spek do
 
   alias Spek.And
   alias Spek.Check
+  alias Spek.Evaluator
   alias Spek.Literal
   alias Spek.Not
   alias Spek.Or
@@ -300,6 +301,16 @@ defmodule Spek do
       all(a, negate(b)),
       all(negate(a), b)
     ])
+  end
+
+  ## Evaluation
+
+  @doc """
+  Lazily evaluates the given expression and returns the result as a boolean.
+  """
+  @spec eval?(expression, term) :: boolean
+  def eval?(expression, context \\ []) do
+    Evaluator.evaluate_expression(expression, context)
   end
 
   @doc false
