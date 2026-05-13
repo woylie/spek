@@ -306,6 +306,15 @@ defmodule Spek do
   ## Evaluation
 
   @doc """
+  Lazily evaluates the given expression and the evaluated expressions until a
+  decision was made.
+  """
+  @spec eval(expression, term) :: boolean
+  def eval(expression, context \\ []) do
+    Evaluator.evaluate_expression_acc(expression, context)
+  end
+
+  @doc """
   Lazily evaluates the given expression and returns the result as a boolean.
   """
   @spec eval?(expression, term) :: boolean
