@@ -5,6 +5,7 @@ defmodule Spek do
 
   alias Spek.And
   alias Spek.Check
+  alias Spek.EvaluationError
   alias Spek.Literal
   alias Spek.Not
   alias Spek.Or
@@ -335,6 +336,33 @@ defmodule Spek do
 
   def eval?(%Or{children: children}, context) do
     Enum.any?(children, &eval?(&1, context))
+  end
+
+  @doc """
+  Lazily evaluates the given expression and raises an exception if it is not
+  satisfied.
+
+  ## Examples
+
+      iex> eval!(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hola, amiga"
+      ...> )
+      :ok
+      
+      iex> eval!(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hello, friend"
+      ...> )
+      ** (Spek.EvaluationError) rule evaluation failed
+  """
+  @spec eval!(expression, context) :: :ok | no_return()
+  def eval!(expression, context \\ []) do
+    if eval?(expression, context) do
+      :ok
+    else
+      raise EvaluationError
+    end
   end
 
   @doc """
