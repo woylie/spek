@@ -429,6 +429,42 @@ defmodule Spek do
 
   defp replace_arg(arg, _), do: arg
 
+  ## Filter/reject
+
+  @doc """
+  Filters the given enumerable to only retain the items that satisfy the given
+  expression.
+
+  ## Example
+
+      iex> filter(
+      ...>   ["hello, friend", "hola, amiga"],
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]}
+      ...> )
+      ["hola, amiga"]
+  """
+  @spec filter(Enumerable.t(), expression) :: Enumerable.t()
+  def filter(items, expression) do
+    Enum.filter(items, &eval?(expression, &1))
+  end
+
+  @doc """
+  Filters the given enumerable to only retain the items that _do not_ satisfy
+  the given expression.
+
+  ## Example
+
+      iex> reject(
+      ...>   ["hello, friend", "hola, amiga"],
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hello"]}
+      ...> )
+      ["hola, amiga"]
+  """
+  @spec reject(Enumerable.t(), expression) :: Enumerable.t()
+  def reject(items, expression) do
+    Enum.reject(items, &eval?(expression, &1))
+  end
+
   @doc false
   def to_boolean(bool) when is_boolean(bool), do: bool
   def to_boolean(:ok), do: true

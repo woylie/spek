@@ -10,4 +10,7 @@ defmodule Spek.Checks do
   def from_result_key(%{result: result}), do: result
 
   def return_arg(arg), do: arg
+
+  def only_active(%{state: :active}), do: true
+  def only_active(%{state: :inactive}), do: false
 end

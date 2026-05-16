@@ -16,6 +16,7 @@ defmodule Spek.MixProject do
       dialyzer: [
         plt_file: {:no_warn, ".plts/dialyzer.plt"}
       ],
+      aliases: aliases(),
       name: "Spek",
       source_url: @source_url,
       homepage_url: @source_url,
@@ -35,7 +36,8 @@ defmodule Spek.MixProject do
         "coveralls.detail": :test,
         "coveralls.post": :test,
         "coveralls.html": :test,
-        "coveralls.github": :test
+        "coveralls.github": :test,
+        precommit: :test
       ]
     ]
   end
@@ -52,7 +54,7 @@ defmodule Spek.MixProject do
     [
       {:credo, "== 1.7.17", only: [:dev, :test], runtime: false},
       {:dialyxir, "1.4.7", only: [:dev, :test], runtime: false},
-      {:ex_doc, "0.40.1", only: :dev, runtime: false},
+      {:ex_doc, "0.40.1", only: [:dev, :test], runtime: false},
       {:excoveralls, "0.18.5", only: :test}
     ]
   end
@@ -84,6 +86,19 @@ defmodule Spek.MixProject do
       ],
       groups_for_extras: [
         Cheatsheets: ~r/cheatsheets\/.?/
+      ]
+    ]
+  end
+
+  def aliases do
+    [
+      precommit: [
+        "compile --warnings-as-errors",
+        "format",
+        "credo",
+        "coveralls --warnings-as-errors",
+        "dialyzer",
+        "docs --warnings-as-errors"
       ]
     ]
   end
