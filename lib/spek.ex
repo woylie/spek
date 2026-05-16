@@ -456,6 +456,44 @@ defmodule Spek do
     end
   end
 
+  @doc """
+  Lazily evaluates the given expression and returns the evaluated part of the
+  expression.
+
+  Raises if the rule is not satisfied. Unlike `eval!/2`, the raised exception
+  contains the evaluated expression.
+
+  ## Examples
+
+      iex> eval_tree!(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hola, amiga"
+      ...> )
+      %Spek.Check{
+        module: String,
+        fun: :starts_with?,
+        args: [:ctx, "hola"],
+        result: true,
+        satisfied?: true
+      }
+      
+      iex> eval_tree!(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hello, friend"
+      ...> )
+      ** (Spek.EvaluationError) rule evaluation failed
+  """
+  @spec eval_tree!(expression, term) :: expression | no_return
+  def eval_tree!(expression, context \\ []) do
+    case do_eval_tree(expression, context) do
+      %{satisfied?: true} = evaluated_expression ->
+        evaluated_expression
+
+      %{satisfied?: false} = evaluated_expression ->
+        raise EvaluationError.with_expression(evaluated_expression)
+    end
+  end
+
   defp do_eval_tree(%Literal{} = literal, _) do
     literal
   end
