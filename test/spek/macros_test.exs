@@ -9,15 +9,17 @@ defmodule Spek.MacrosTest do
 
     build_check(:user_active, [{:ctx, :state}, :active])
 
-    defcheck :account_balanced, account,
-      args: [:ctx],
-      reason: :account_unbalanced do
+    defcheck account_balanced(account,
+               args: [:ctx],
+               reason: :account_unbalanced
+             ) do
       account.balance >= 0
     end
 
-    defcheck :matching_organization, [user, organization],
-      args: [{:ctx, :user}, {:ctx, :organization}],
-      reason: :no_organization_match do
+    defcheck matching_organization(user, organization,
+               args: [{:ctx, :user}, {:ctx, :organization}],
+               reason: :no_organization_match
+             ) do
       user.organization_id == organization.id
     end
   end

@@ -86,11 +86,13 @@ defmodule Spek.Macros do
       defmodule MyApp.MyModule do
         import Spek.Macros
         
-        defcheck :account_balanced, account,
-          args: [:ctx],
-          reason: :account_unbalanced do
+        defcheck account_balanced(account,
+                   args: [:ctx],
+                   reason: :account_unbalanced
+                 ) do
           account.balance >= 0
         end
+
       end
 
   Will result in these three functions:
@@ -109,12 +111,27 @@ defmodule Spek.Macros do
         %Check{module: MyApp.MyModule, fun: :account_balanced, args: [:ctx]}
       end
 
+  The `account_balanced?/1` and `account_balanced/1` functions can be used
+  directly, and the `account_balanced_check/0` function can be used directly
+  with the Spek evaluation functions, or be combined with additional checks to
+  define complex rules.
+
+      def transfer_rule do
+        Spek.all([
+          account_balanced_check(),
+          # additional checks
+        ])
+      end
+
+      Spek.eval(transfer_rule(), %Account{balance: 100})
+
   The generated functions can have an arbitrary number of arguments. For
   example, this macro call defines two arguments, `user` and `organization`:
 
-      defcheck :matching_organization, [user, organization],
-        args: [{:ctx, :user}, {:ctx, :organization}],
-        reason: :no_organization_match do
+      defcheck matching_organization(user, organization,
+                 args: [{:ctx, :user}, {:ctx, :organization}],
+                 reason: :no_organization_match
+               ) do
         user.organization_id == organization.id
       end
 
@@ -137,9 +154,18 @@ defmodule Spek.Macros do
           args: [{:ctx, :user}, {:ctx, :organization}]
         }
       end
+
+  In this case, we would call the Spek evaluation functions like this:
+
+      Spek.eval(matching_organization_check(),
+        user: %User{organization_id: 1},
+        organization: %Organization{id: 1}
+      )
   """
-  defmacro defcheck(name, args, opts, do: body) do
-    args = List.wrap(args)
+  defmacro defcheck({name, _, raw_args}, do: body) do
+    {call_args, [opts]} =
+      Enum.split(raw_args, length(raw_args) - 1)
+
     reason = Keyword.get(opts, :reason, :failed)
     check_args = Keyword.fetch!(opts, :args)
     module = __CALLER__.module
@@ -156,12 +182,12 @@ defmodule Spek.Macros do
         }
       end
 
-      def unquote(predicate_fun_name)(unquote_splicing(args)) do
+      def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
         unquote(body)
       end
 
-      def unquote(name)(unquote_splicing(args)) do
-        if unquote(predicate_fun_name)(unquote_splicing(args)),
+      def unquote(name)(unquote_splicing(call_args)) do
+        if unquote(predicate_fun_name)(unquote_splicing(call_args)),
           do: :ok,
           else: {:error, unquote(reason)}
       end
