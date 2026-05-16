@@ -22,6 +22,14 @@ defmodule Spek.MacrosTest do
              ) do
       user.organization_id == organization.id
     end
+
+    defcheck always_true() do
+      true
+    end
+
+    defcheck always_false do
+      false
+    end
   end
 
   describe "build_check/2" do
@@ -85,6 +93,26 @@ defmodule Spek.MacrosTest do
 
       assert Checks.matching_organization(%{organization_id: 1}, %{id: 2}) ==
                {:error, :no_organization_match}
+    end
+
+    test "can define check without args and opts that is always true" do
+      assert Checks.always_true_check() == %Spek.Literal{
+               value: true,
+               satisfied?: true
+             }
+
+      assert Checks.always_true?() == true
+      assert Checks.always_true() == :ok
+    end
+
+    test "can define check without args and opts that is always false" do
+      assert Checks.always_false_check() == %Spek.Literal{
+               value: false,
+               satisfied?: false
+             }
+
+      assert Checks.always_false?() == false
+      assert Checks.always_false() == {:error, :failed}
     end
   end
 end

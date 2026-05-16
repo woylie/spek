@@ -175,9 +175,11 @@ defmodule Spek.Macros do
         organization: %Organization{id: 1}
       )
   """
+  # credo:disable-for-next-line
   defmacro defcheck({name, _, raw_args}, do: body) do
-    {call_args, [opts]} =
-      Enum.split(raw_args, length(raw_args) - 1)
+    raw_args = raw_args || []
+    {call_args, opts} = Enum.split(raw_args, length(raw_args) - 1)
+    opts = List.first(opts) || []
 
     reason = Keyword.get(opts, :reason, :failed)
     check_args = Keyword.get(opts, :args, [:ctx])
@@ -190,29 +192,70 @@ defmodule Spek.Macros do
         quote(do: term())
       end
 
-    quote do
-      @spec unquote(check_fun_name)(Spek.context()) :: Spek.Check.t()
-      def unquote(check_fun_name)(args \\ unquote(check_args)) do
-        %Spek.Check{
-          module: unquote(module),
-          fun: unquote(name),
-          args: args
-        }
-      end
+    case body do
+      true ->
+        quote do
+          @spec unquote(check_fun_name)(Spek.context()) :: Spek.Literal.t()
+          def unquote(check_fun_name)(args \\ unquote(check_args)) do
+            %Spek.Literal{value: true, satisfied?: true}
+          end
 
-      @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
-              boolean()
-      def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
-        unquote(body)
-      end
+          @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) :: true
+          def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
+            true
+          end
 
-      @spec unquote(name)(unquote_splicing(arg_types)) ::
-              :ok | {:error, unquote(reason)}
-      def unquote(name)(unquote_splicing(call_args)) do
-        if unquote(predicate_fun_name)(unquote_splicing(call_args)),
-          do: :ok,
-          else: {:error, unquote(reason)}
-      end
+          @spec unquote(name)(unquote_splicing(arg_types)) :: :ok
+          def unquote(name)(unquote_splicing(call_args)) do
+            :ok
+          end
+        end
+
+      false ->
+        quote do
+          @spec unquote(check_fun_name)(Spek.context()) :: Spek.Literal.t()
+          def unquote(check_fun_name)(args \\ unquote(check_args)) do
+            %Spek.Literal{value: false, satisfied?: false}
+          end
+
+          @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
+                  false
+          def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
+            false
+          end
+
+          @spec unquote(name)(unquote_splicing(arg_types)) ::
+                  {:error, unquote(reason)}
+          def unquote(name)(unquote_splicing(call_args)) do
+            {:error, unquote(reason)}
+          end
+        end
+
+      _ ->
+        quote do
+          @spec unquote(check_fun_name)(Spek.context()) :: Spek.Check.t()
+          def unquote(check_fun_name)(args \\ unquote(check_args)) do
+            %Spek.Check{
+              module: unquote(module),
+              fun: unquote(name),
+              args: args
+            }
+          end
+
+          @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
+                  boolean()
+          def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
+            unquote(body)
+          end
+
+          @spec unquote(name)(unquote_splicing(arg_types)) ::
+                  :ok | {:error, unquote(reason)}
+          def unquote(name)(unquote_splicing(call_args)) do
+            if unquote(predicate_fun_name)(unquote_splicing(call_args)),
+              do: :ok,
+              else: {:error, unquote(reason)}
+          end
+        end
     end
   end
 end
