@@ -7,16 +7,66 @@ defmodule Spek.MacrosTest do
   defmodule Checks do
     import Spek.Macros
 
-    build_check(:existing_fun, [{:ctx, :state}, :active])
+    build_check(:user_active, [{:ctx, :state}, :active])
+
+    defcheck :account_balanced, account,
+      args: [:ctx],
+      reason: :account_unbalanced do
+      account.balance >= 0
+    end
+
+    defcheck :matching_organization, [user, organization],
+      args: [{:ctx, :user}, {:ctx, :organization}],
+      reason: :no_organization_match do
+      user.organization_id == organization.id
+    end
   end
 
   describe "build_check/2" do
     test "defines a function that returns a check struct" do
-      assert Checks.existing_fun_check() == %Check{
+      assert Checks.user_active_check() == %Check{
                args: [{:ctx, :state}, :active],
-               fun: :existing_fun,
+               fun: :user_active,
                module: Spek.MacrosTest.Checks
              }
+    end
+  end
+
+  describe "defcheck/3" do
+    test "defines a function that returns a check struct" do
+      assert Checks.account_balanced_check() == %Check{
+               args: [:ctx],
+               fun: :account_balanced,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "defines a predicate function" do
+      assert Checks.account_balanced?(%{balance: 1}) == true
+      assert Checks.account_balanced?(%{balance: -1}) == false
+    end
+
+    test "defines an ok/error function" do
+      assert Checks.account_balanced(%{balance: 1}) == :ok
+
+      assert Checks.account_balanced(%{balance: -1}) ==
+               {:error, :account_unbalanced}
+    end
+
+    test "defines an predicate function with multiple arguments" do
+      assert Checks.matching_organization?(%{organization_id: 1}, %{id: 1}) ==
+               true
+
+      assert Checks.matching_organization?(%{organization_id: 1}, %{id: 2}) ==
+               false
+    end
+
+    test "defines an ok/error function with multiple arguments" do
+      assert Checks.matching_organization(%{organization_id: 1}, %{id: 1}) ==
+               :ok
+
+      assert Checks.matching_organization(%{organization_id: 1}, %{id: 2}) ==
+               {:error, :no_organization_match}
     end
   end
 end
