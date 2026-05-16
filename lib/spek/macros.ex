@@ -73,6 +73,7 @@ defmodule Spek.Macros do
     argument names can be used in the do-block.
   - `opts` - Additional options:
     - `:args` - The list of arguments as used in the `Spek.Check` struct.
+      Defaults to `[:ctx]`.
     - `:reason` - The reason used in the error tuple. Defaults to `:failed`.
 
   ## Do-block
@@ -179,7 +180,7 @@ defmodule Spek.Macros do
       Enum.split(raw_args, length(raw_args) - 1)
 
     reason = Keyword.get(opts, :reason, :failed)
-    check_args = Keyword.fetch!(opts, :args)
+    check_args = Keyword.get(opts, :args, [:ctx])
     module = __CALLER__.module
     check_fun_name = :"#{name}_check"
     predicate_fun_name = :"#{name}?"
