@@ -119,11 +119,11 @@ defmodule SpekTest do
              }) == true
     end
 
-    test "evaluates And without children" do
+    test "evaluates AllOf without children" do
       assert Spek.eval?(%AllOf{children: []}) == true
     end
 
-    test "evaluates And with one child" do
+    test "evaluates AllOf with one child" do
       assert Spek.eval?(%AllOf{
                children: [%Literal{satisfied?: true, result: :ok}]
              }) == true
@@ -133,7 +133,7 @@ defmodule SpekTest do
              }) == false
     end
 
-    test "evaluates And with two children" do
+    test "evaluates AllOf with two children" do
       test_cases = [
         # first child, second child, expected result
         {true, true, true},
@@ -152,11 +152,11 @@ defmodule SpekTest do
       end
     end
 
-    test "evaluates Or without children" do
+    test "evaluates AnyOf without children" do
       assert Spek.eval?(%AnyOf{children: []}) == false
     end
 
-    test "evaluates Or with one child" do
+    test "evaluates AnyOf with one child" do
       assert Spek.eval?(%AnyOf{
                children: [%Literal{satisfied?: true}]
              }) == true
@@ -166,7 +166,7 @@ defmodule SpekTest do
              }) == false
     end
 
-    test "evaluates Or with two children" do
+    test "evaluates AnyOf with two children" do
       test_cases = [
         # first child, second child, expected result
         {true, true, true},
@@ -442,7 +442,7 @@ defmodule SpekTest do
                 }}
     end
 
-    test "evaluates And without children" do
+    test "evaluates AllOf without children" do
       assert Spek.eval_tree(%AllOf{children: []}) ==
                {:ok,
                 %AllOf{
@@ -451,7 +451,7 @@ defmodule SpekTest do
                 }}
     end
 
-    test "evaluates And with one child" do
+    test "evaluates AllOf with one child" do
       assert Spek.eval_tree(%AllOf{
                children: [
                  %Check{module: Checks, fun: :return_arg, args: [:ok]}
@@ -492,7 +492,7 @@ defmodule SpekTest do
              }
     end
 
-    test "evaluates And with two children" do
+    test "evaluates AllOf with two children" do
       # all checks true
       assert Spek.eval_tree(%AllOf{
                children: [
@@ -573,7 +573,7 @@ defmodule SpekTest do
              }
     end
 
-    test "evaluates Or without children" do
+    test "evaluates AnyOf without children" do
       assert {:error, %EvaluationError{expression: expression}} =
                Spek.eval_tree(%AnyOf{children: []})
 
@@ -583,7 +583,7 @@ defmodule SpekTest do
              }
     end
 
-    test "evaluates Or with one child" do
+    test "evaluates AnyOf with one child" do
       assert Spek.eval_tree(%AnyOf{
                children: [
                  %Check{module: Checks, fun: :return_arg, args: [:ok]}
@@ -624,7 +624,7 @@ defmodule SpekTest do
              }
     end
 
-    test "evaluates Or with two children" do
+    test "evaluates AnyOf with two children" do
       # first check true, second check shouldn't have been evaluated
       assert Spek.eval_tree(%AnyOf{
                children: [
@@ -702,6 +702,67 @@ defmodule SpekTest do
                ],
                satisfied?: false
              }
+    end
+  end
+
+  describe "eval_tree_all/2" do
+    test "does not stop early with AllOf" do
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree_all(%AllOf{
+                 children: [
+                   %Check{module: Checks, fun: :return_arg, args: [:error]},
+                   %Check{module: Checks, fun: :return_arg, args: [true]}
+                 ]
+               })
+
+      assert expression == %AllOf{
+               children: [
+                 %Check{
+                   module: Checks,
+                   fun: :return_arg,
+                   args: [:error],
+                   result: :error,
+                   satisfied?: false
+                 },
+                 %Check{
+                   module: Checks,
+                   fun: :return_arg,
+                   args: [true],
+                   result: true,
+                   satisfied?: true
+                 }
+               ],
+               satisfied?: false
+             }
+    end
+
+    test "does not stop early with AnyOf" do
+      assert Spek.eval_tree_all(%AnyOf{
+               children: [
+                 %Check{module: Checks, fun: :return_arg, args: [:ok]},
+                 %Check{module: Checks, fun: :return_arg, args: [:error]}
+               ]
+             }) ==
+               {:ok,
+                %AnyOf{
+                  children: [
+                    %Check{
+                      module: Checks,
+                      fun: :return_arg,
+                      args: [:ok],
+                      result: :ok,
+                      satisfied?: true
+                    },
+                    %Check{
+                      module: Checks,
+                      fun: :return_arg,
+                      args: [:error],
+                      result: :error,
+                      satisfied?: false
+                    }
+                  ],
+                  satisfied?: true
+                }}
     end
   end
 

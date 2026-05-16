@@ -308,7 +308,9 @@ defmodule Spek do
   ## Evaluation
 
   @doc """
-  Lazily evaluates the given expression and returns the result as a boolean.
+  Evaluates the given expression and returns the result as a boolean.
+
+  Stops early as soon as the final outcome is determined.
 
   ## Examples
 
@@ -354,7 +356,9 @@ defmodule Spek do
   end
 
   @doc """
-  Lazily evaluates the given expression and returns `:ok` or an error.
+  Evaluates the given expression and returns `:ok` or an error tuple.
+
+  Stops early as soon as the final outcome is determined.
 
   ## Examples
 
@@ -381,8 +385,9 @@ defmodule Spek do
   end
 
   @doc """
-  Lazily evaluates the given expression and raises an exception if it is not
-  satisfied.
+  Evaluates the given expression and raises an exception if it is not satisfied.
+
+  Stops early as soon as the final outcome is determined.
 
   ## Examples
 
@@ -409,8 +414,11 @@ defmodule Spek do
   end
 
   @doc """
-  Lazily evaluates the given expression and returns the evaluated part of the
-  expression.
+  Evaluates the given expression and returns the expression annotated with
+  evaluation results.
+
+  Stops early as soon as the final outcome is determined. The returned
+  expression only contains the evaluated parts.
 
   ## Examples
 
@@ -451,7 +459,7 @@ defmodule Spek do
   @spec eval_tree(expression, term) ::
           {:ok, expression} | {:error, EvaluationError.t()}
   def eval_tree(expression, context \\ []) do
-    case do_eval_tree(expression, context) do
+    case do_eval_tree(expression, context, :halt) do
       %{satisfied?: true} = evaluated_expression ->
         {:ok, evaluated_expression}
 
@@ -461,11 +469,14 @@ defmodule Spek do
   end
 
   @doc """
-  Lazily evaluates the given expression and returns the evaluated part of the
-  expression.
+  Evaluates the given expression and returns the expression annotated with
+  evaluation results.
 
-  Raises if the rule is not satisfied. Unlike `eval!/2`, the raised exception
-  contains the evaluated expression.
+  Stops early as soon as the final outcome is determined. The returned
+  expression only contains the evaluated parts.
+
+  Raises an exception if the rule is not satisfied. Unlike `eval!/2`, the
+  exception contains the evaluated expression.
 
   ## Examples
 
@@ -490,7 +501,7 @@ defmodule Spek do
   @doc type: :evaluation
   @spec eval_tree!(expression, term) :: expression | no_return
   def eval_tree!(expression, context \\ []) do
-    case do_eval_tree(expression, context) do
+    case do_eval_tree(expression, context, :halt) do
       %{satisfied?: true} = evaluated_expression ->
         evaluated_expression
 
@@ -499,13 +510,156 @@ defmodule Spek do
     end
   end
 
-  defp do_eval_tree(%Literal{} = literal, _) do
+  @doc """
+  Evaluates the given expression and returns the expression annotated with the
+  expression result.
+
+  Always evaluates the entire expression, even if the final outcome could be
+  determined earlier.
+
+  ## Examples
+
+      iex> eval_tree_all(
+      ...>   all_of([
+      ...>     %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>     %Check{module: String, fun: :ends_with?, args: [:ctx, "amiga"]}
+      ...>   ]),
+      ...>   "hola, amiga"
+      ...> )
+      {
+        :ok,
+        %Spek.AllOf{
+          children: [
+            %Spek.Check{
+              module: String,
+              fun: :starts_with?,
+              args: [:ctx, "hola"],
+              result: true,
+              satisfied?: true
+            },
+            %Spek.Check{
+              module: String,
+              fun: :ends_with?,
+              args: [:ctx, "amiga"],
+              result: true,
+              satisfied?: true
+            }
+          ],
+          satisfied?: true
+        }
+      }
+
+      iex> eval_tree_all(
+      ...>   all_of([
+      ...>     %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>     %Check{module: String, fun: :ends_with?, args: [:ctx, "amiga"]}
+      ...>   ]),
+      ...>   "hola, amigo"
+      ...> )
+      {
+        :error,
+        %Spek.EvaluationError{
+          expression: %Spek.AllOf{
+            children: [
+              %Spek.Check{
+                module: String,
+                fun: :starts_with?,
+                args: [:ctx, "hola"],
+                result: true,
+                satisfied?: true
+              },
+              %Spek.Check{
+                module: String,
+                fun: :ends_with?,
+                args: [:ctx, "amiga"],
+                result: false,
+                satisfied?: false
+              }
+            ],
+            satisfied?: false
+          },
+          message: "rule evaluation failed"
+        }
+      }
+  """
+  @doc type: :evaluation
+  @spec eval_tree_all(expression, term) ::
+          {:ok, expression} | {:error, EvaluationError.t()}
+  def eval_tree_all(expression, context \\ []) do
+    case do_eval_tree(expression, context, :cont) do
+      %{satisfied?: true} = evaluated_expression ->
+        {:ok, evaluated_expression}
+
+      %{satisfied?: false} = evaluated_expression ->
+        {:error, EvaluationError.with_expression(evaluated_expression)}
+    end
+  end
+
+  @doc """
+  Evaluates the given expression and returns the expression annotated with
+  evaluation results.
+
+  Raises if the expression is not satisfied. Unlike `eval!/2`, the raised
+  exception contains the evaluated expression.
+
+  Always evaluates the entire expression, even if the final outcome could be
+  determined earlier.
+
+  ## Examples
+
+      iex> eval_tree_all!(
+      ...>   any_of([
+      ...>     %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>     %Check{module: String, fun: :ends_with?, args: [:ctx, "amiga"]}
+      ...>   ]),
+      ...>   "hola, amiga"
+      ...> )
+      %Spek.AnyOf{
+        satisfied?: true,
+        children: [
+          %Spek.Check{
+            module: String,
+            fun: :starts_with?,
+            args: [:ctx, "hola"],
+            result: true,
+            satisfied?: true
+          },
+          %Spek.Check{
+            module: String,
+            fun: :ends_with?,
+            args: [:ctx, "amiga"],
+            result: true,
+            satisfied?: true
+          }
+        ]
+      }
+
+      iex> eval_tree_all!(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hello, friend"
+      ...> )
+      ** (Spek.EvaluationError) rule evaluation failed
+  """
+  @doc type: :evaluation
+  @spec eval_tree_all!(expression, term) :: expression | no_return
+  def eval_tree_all!(expression, context \\ []) do
+    case do_eval_tree(expression, context, :cont) do
+      %{satisfied?: true} = evaluated_expression ->
+        evaluated_expression
+
+      %{satisfied?: false} = evaluated_expression ->
+        raise EvaluationError.with_expression(evaluated_expression)
+    end
+  end
+
+  defp do_eval_tree(%Literal{} = literal, _, _) do
     literal
   end
 
   defp do_eval_tree(
          %Check{module: module, fun: fun, args: args} = check,
-         context
+         context,
+         _
        ) do
     result = apply(module, fun, replace_args(args, context))
     %{check | result: result, satisfied?: Spek.to_boolean(result)}
@@ -513,10 +667,11 @@ defmodule Spek do
 
   defp do_eval_tree(
          %Not{expression: expression} = not_expr,
-         context
+         context,
+         mode
        ) do
     evaluated_expression =
-      do_eval_tree(expression, context)
+      do_eval_tree(expression, context, mode)
 
     %{
       not_expr
@@ -527,13 +682,14 @@ defmodule Spek do
 
   defp do_eval_tree(
          %AllOf{children: children} = and_,
-         context
+         context,
+         mode
        ) do
     {satisfied?, evaluated_children} =
       Enum.reduce_while(
         children,
         {true, []},
-        &and_reducer(&1, &2, context)
+        &all_of_reducer(&1, &2, context, mode)
       )
 
     %{and_ | satisfied?: satisfied?, children: Enum.reverse(evaluated_children)}
@@ -541,29 +697,36 @@ defmodule Spek do
 
   defp do_eval_tree(
          %AnyOf{children: children} = or_,
-         context
+         context,
+         mode
        ) do
     {satisfied?, evaluated_children} =
       Enum.reduce_while(
         children,
         {false, []},
-        &any_of_reducer(&1, &2, context)
+        &any_of_reducer(&1, &2, context, mode)
       )
 
     %{or_ | satisfied?: satisfied?, children: Enum.reverse(evaluated_children)}
   end
 
-  defp and_reducer(expression, {_, acc}, context) do
-    case do_eval_tree(expression, context) do
-      %{satisfied?: true} = expr -> {:cont, {true, [expr | acc]}}
-      %{satisfied?: false} = expr -> {:halt, {false, [expr | acc]}}
+  defp all_of_reducer(expression, {previous_result, acc}, context, mode) do
+    case do_eval_tree(expression, context, mode) do
+      %{satisfied?: true} = expr ->
+        {:cont, {previous_result, [expr | acc]}}
+
+      %{satisfied?: false} = expr ->
+        {mode, {false, [expr | acc]}}
     end
   end
 
-  defp any_of_reducer(expression, {_, acc}, context) do
-    case do_eval_tree(expression, context) do
-      %{satisfied?: true} = expr -> {:halt, {true, [expr | acc]}}
-      %{satisfied?: false} = expr -> {:cont, {false, [expr | acc]}}
+  defp any_of_reducer(expression, {previous_result, acc}, context, mode) do
+    case do_eval_tree(expression, context, mode) do
+      %{satisfied?: true} = expr ->
+        {mode, {true, [expr | acc]}}
+
+      %{satisfied?: false} = expr ->
+        {:cont, {false or previous_result, [expr | acc]}}
     end
   end
 
