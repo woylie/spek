@@ -353,6 +353,32 @@ defmodule Spek do
   end
 
   @doc """
+  Lazily evaluates the given expression and returns `:ok` or an error.
+
+  ## Examples
+
+      iex> eval(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hola, amiga"
+      ...> )
+      :ok
+      
+      iex> eval(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hello, friend"
+      ...> )
+      {:error, %Spek.EvaluationError{message: "rule evaluation failed"}}
+  """
+  @spec eval(expression, context) :: :ok | {:error, EvaluationError.t()}
+  def eval(expression, context \\ []) do
+    if eval?(expression, context) do
+      :ok
+    else
+      {:error, EvaluationError.new()}
+    end
+  end
+
+  @doc """
   Lazily evaluates the given expression and raises an exception if it is not
   satisfied.
 
