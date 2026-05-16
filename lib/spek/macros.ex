@@ -42,11 +42,11 @@ defmodule Spek.Macros do
 
     quote do
       @spec unquote(function_name)() :: Spec.Check.t()
-      def unquote(function_name)() do
+      def unquote(function_name)(args \\ unquote(args)) do
         %Spek.Check{
           module: unquote(module),
           fun: unquote(fun),
-          args: unquote(args)
+          args: args
         }
       end
     end
@@ -77,7 +77,7 @@ defmodule Spek.Macros do
 
   ## Do-block
 
-  The do-block is required to be a boolean expression
+  The do-block is required to evaluate to a boolean value.
 
   ## Example
 
@@ -107,8 +107,8 @@ defmodule Spek.Macros do
           else: {:error, :account_unbalanced}
       end
 
-      def account_balanced_check do
-        %Check{module: MyApp.MyModule, fun: :account_balanced, args: [:ctx]}
+      def account_balanced_check(args \\\\ [:ctx]) do
+        %Check{module: MyApp.MyModule, fun: :account_balanced, args: args}
       end
 
   The `account_balanced?/1` and `account_balanced/1` functions can be used
@@ -117,13 +117,25 @@ defmodule Spek.Macros do
   define complex rules.
 
       def transfer_rule do
-        Spek.all([
+        Spek.and([
           account_balanced_check(),
           # additional checks
         ])
       end
 
       Spek.eval(transfer_rule(), %Account{balance: 100})
+
+  You can also override the check arguments, e.g. if you combine multiple checks
+  that work on different data:
+
+      def transfer_rule do
+        Spek.and([
+          account_balanced_check([{:ctx, :account}]),
+          # additional checks
+        ])
+      end
+
+      Spek.eval(transfer_rule(), account: %Account{balance: 100})
 
   The generated functions can have an arbitrary number of arguments. For
   example, this macro call defines two arguments, `user` and `organization`:
@@ -147,11 +159,11 @@ defmodule Spek.Macros do
           else: {:error, :no_organization_match}
       end
 
-      def matching_organization_check do
+      def matching_organization_check(args \\\\ [{:ctx, :user}, {:ctx, :organization}]) do
         %Check{
           module: MyApp.MyModule,
           fun: :matching_organization,
-          args: [{:ctx, :user}, {:ctx, :organization}]
+          args: args
         }
       end
 
@@ -174,11 +186,11 @@ defmodule Spek.Macros do
 
     quote do
       @spec unquote(check_fun_name)() :: Spec.Check.t()
-      def unquote(check_fun_name)() do
+      def unquote(check_fun_name)(args \\ unquote(check_args)) do
         %Spek.Check{
           module: unquote(module),
           fun: unquote(name),
-          args: unquote(check_args)
+          args: args
         }
       end
 

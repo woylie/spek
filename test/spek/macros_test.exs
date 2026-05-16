@@ -32,12 +32,28 @@ defmodule Spek.MacrosTest do
                module: Spek.MacrosTest.Checks
              }
     end
+
+    test "can override the default args" do
+      assert Checks.user_active_check([{:ctx, :status}, :active]) == %Check{
+               args: [{:ctx, :status}, :active],
+               fun: :user_active,
+               module: Spek.MacrosTest.Checks
+             }
+    end
   end
 
   describe "defcheck/3" do
     test "defines a function that returns a check struct" do
       assert Checks.account_balanced_check() == %Check{
                args: [:ctx],
+               fun: :account_balanced,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "can override the check args" do
+      assert Checks.account_balanced_check([{:ctx, :account}]) == %Check{
+               args: [{:ctx, :account}],
                fun: :account_balanced,
                module: Spek.MacrosTest.Checks
              }
