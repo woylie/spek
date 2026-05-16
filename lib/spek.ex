@@ -3,14 +3,14 @@ defmodule Spek do
   Documentation for `Spek`.
   """
 
-  alias Spek.And
+  alias Spek.AllOf
+  alias Spek.AnyOf
   alias Spek.Check
   alias Spek.EvaluationError
   alias Spek.Literal
   alias Spek.Not
-  alias Spek.Or
 
-  @type expression :: And.t() | Or.t() | Check.t() | Literal.t() | Not.t()
+  @type expression :: AllOf.t() | AnyOf.t() | Check.t() | Literal.t() | Not.t()
 
   @type context :: term
 
@@ -25,8 +25,8 @@ defmodule Spek do
 
   ## Example
 
-      iex> all([check(MyModule, :check_a, []), check(MyModule, :check_b, [])])
-      %Spek.And{
+      iex> all_of([check(MyModule, :check_a, []), check(MyModule, :check_b, [])])
+      %Spek.AllOf{
         children: [
           %Spek.Check{module: MyModule, fun: :check_a, args: []},
           %Spek.Check{module: MyModule, fun: :check_b, args: []}
@@ -34,9 +34,9 @@ defmodule Spek do
       }
   """
   @doc type: :builder
-  @spec all([expression]) :: And.t()
-  def all(children) when is_list(children) do
-    %And{children: children}
+  @spec all_of([expression]) :: AllOf.t()
+  def all_of(children) when is_list(children) do
+    %AllOf{children: children}
   end
 
   @doc """
@@ -44,8 +44,8 @@ defmodule Spek do
 
   ## Example
 
-      iex> all(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
-      %Spek.And{
+      iex> all_of(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
+      %Spek.AllOf{
         children: [
           %Spek.Check{module: MyModule, fun: :check_a, args: []},
           %Spek.Check{module: MyModule, fun: :check_b, args: []}
@@ -53,9 +53,9 @@ defmodule Spek do
       }
   """
   @doc type: :builder
-  @spec all(expression, expression) :: And.t()
-  def all(a, b) do
-    %And{children: [a, b]}
+  @spec all_of(expression, expression) :: AllOf.t()
+  def all_of(a, b) do
+    %AllOf{children: [a, b]}
   end
 
   @doc """
@@ -63,8 +63,8 @@ defmodule Spek do
 
   ## Example
 
-      iex> any([check(MyModule, :check_a, []), check(MyModule, :check_b, [])])
-      %Spek.Or{
+      iex> any_of([check(MyModule, :check_a, []), check(MyModule, :check_b, [])])
+      %Spek.AnyOf{
         children: [
           %Spek.Check{module: MyModule, fun: :check_a, args: []},
           %Spek.Check{module: MyModule, fun: :check_b, args: []}
@@ -72,9 +72,9 @@ defmodule Spek do
       }
   """
   @doc type: :builder
-  @spec any([expression]) :: Or.t()
-  def any(children) when is_list(children) do
-    %Or{children: children}
+  @spec any_of([expression]) :: AnyOf.t()
+  def any_of(children) when is_list(children) do
+    %AnyOf{children: children}
   end
 
   @doc """
@@ -82,8 +82,8 @@ defmodule Spek do
 
   ## Example
 
-      iex> any(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
-      %Spek.Or{
+      iex> any_of(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
+      %Spek.AnyOf{
         children: [
           %Spek.Check{module: MyModule, fun: :check_a, args: []},
           %Spek.Check{module: MyModule, fun: :check_b, args: []}
@@ -91,9 +91,9 @@ defmodule Spek do
       }
   """
   @doc type: :builder
-  @spec any(expression, expression) :: Or.t()
-  def any(a, b) do
-    %Or{children: [a, b]}
+  @spec any_of(expression, expression) :: AnyOf.t()
+  def any_of(a, b) do
+    %AnyOf{children: [a, b]}
   end
 
   @doc """
@@ -166,7 +166,7 @@ defmodule Spek do
 
       iex> nand(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
       %Spek.Not{
-        expression: %Spek.And{
+        expression: %Spek.AllOf{
           children: [
             %Spek.Check{module: MyModule, fun: :check_a, args: []},
             %Spek.Check{module: MyModule, fun: :check_b, args: []}
@@ -177,7 +177,7 @@ defmodule Spek do
   @doc type: :builder
   @spec nand(expression, expression) :: expression
   def nand(a, b) do
-    negate(all(a, b))
+    negate(all_of(a, b))
   end
 
   @doc """
@@ -206,7 +206,7 @@ defmodule Spek do
 
       iex> none([check(MyModule, :check_a, []), check(MyModule, :check_b, [])])
       %Spek.Not{
-        expression: %Spek.Or{
+        expression: %Spek.AnyOf{
           children: [
             %Spek.Check{module: MyModule, fun: :check_a, args: []},
             %Spek.Check{module: MyModule, fun: :check_b, args: []}
@@ -217,7 +217,7 @@ defmodule Spek do
   @doc type: :builder
   @spec none([expression]) :: expression
   def none(children) when is_list(children) do
-    negate(any(children))
+    negate(any_of(children))
   end
 
   @doc """
@@ -227,7 +227,7 @@ defmodule Spek do
 
       iex> nor(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
       %Spek.Not{
-        expression: %Spek.Or{
+        expression: %Spek.AnyOf{
           children: [
             %Spek.Check{module: MyModule, fun: :check_a, args: []},
             %Spek.Check{module: MyModule, fun: :check_b, args: []}
@@ -238,7 +238,7 @@ defmodule Spek do
   @doc type: :builder
   @spec nor(expression, expression) :: expression
   def nor(a, b) do
-    negate(any(a, b))
+    negate(any_of(a, b))
   end
 
   @doc """
@@ -267,9 +267,9 @@ defmodule Spek do
   ## Example
 
       iex> xor(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
-      %Spek.Or{
+      %Spek.AnyOf{
         children: [
-          %Spek.And{
+          %Spek.AllOf{
             children: [
               %Spek.Check{module: MyModule, fun: :check_a, args: []},
               %Spek.Not{
@@ -281,7 +281,7 @@ defmodule Spek do
               }
             ]
           },
-          %Spek.And{
+          %Spek.AllOf{
             children: [
               %Spek.Not{
                 expression: %Spek.Check{
@@ -299,9 +299,9 @@ defmodule Spek do
   @doc type: :builder
   @spec xor(expression, expression) :: expression
   def xor(a, b) do
-    any([
-      all(a, negate(b)),
-      all(negate(a), b)
+    any_of([
+      all_of(a, negate(b)),
+      all_of(negate(a), b)
     ])
   end
 
@@ -345,11 +345,11 @@ defmodule Spek do
     not eval?(expression, context)
   end
 
-  def eval?(%And{children: children}, context) do
+  def eval?(%AllOf{children: children}, context) do
     Enum.all?(children, &eval?(&1, context))
   end
 
-  def eval?(%Or{children: children}, context) do
+  def eval?(%AnyOf{children: children}, context) do
     Enum.any?(children, &eval?(&1, context))
   end
 
@@ -526,7 +526,7 @@ defmodule Spek do
   end
 
   defp do_eval_tree(
-         %And{children: children} = and_,
+         %AllOf{children: children} = and_,
          context
        ) do
     {satisfied?, evaluated_children} =
@@ -540,7 +540,7 @@ defmodule Spek do
   end
 
   defp do_eval_tree(
-         %Or{children: children} = or_,
+         %AnyOf{children: children} = or_,
          context
        ) do
     {satisfied?, evaluated_children} =

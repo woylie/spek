@@ -1,4 +1,4 @@
-defmodule Spek.And do
+defmodule Spek.AllOf do
   @moduledoc """
   Struct that represents a combination of expressions that all must be true.
 

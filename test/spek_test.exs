@@ -1,13 +1,13 @@
 defmodule SpekTest do
   use ExUnit.Case
 
-  alias Spek.And
+  alias Spek.AllOf
+  alias Spek.AnyOf
   alias Spek.Check
   alias Spek.Checks
   alias Spek.EvaluationError
   alias Spek.Literal
   alias Spek.Not
-  alias Spek.Or
 
   doctest Spek, import: true
 
@@ -120,15 +120,15 @@ defmodule SpekTest do
     end
 
     test "evaluates And without children" do
-      assert Spek.eval?(%And{children: []}) == true
+      assert Spek.eval?(%AllOf{children: []}) == true
     end
 
     test "evaluates And with one child" do
-      assert Spek.eval?(%And{
+      assert Spek.eval?(%AllOf{
                children: [%Literal{satisfied?: true, result: :ok}]
              }) == true
 
-      assert Spek.eval?(%And{
+      assert Spek.eval?(%AllOf{
                children: [%Literal{satisfied?: false, result: :error}]
              }) == false
     end
@@ -143,7 +143,7 @@ defmodule SpekTest do
       ]
 
       for {v1, v2, expected} <- test_cases do
-        assert Spek.eval?(%And{
+        assert Spek.eval?(%AllOf{
                  children: [
                    %Literal{satisfied?: v1},
                    %Literal{satisfied?: v2}
@@ -153,15 +153,15 @@ defmodule SpekTest do
     end
 
     test "evaluates Or without children" do
-      assert Spek.eval?(%Or{children: []}) == false
+      assert Spek.eval?(%AnyOf{children: []}) == false
     end
 
     test "evaluates Or with one child" do
-      assert Spek.eval?(%Or{
+      assert Spek.eval?(%AnyOf{
                children: [%Literal{satisfied?: true}]
              }) == true
 
-      assert Spek.eval?(%Or{
+      assert Spek.eval?(%AnyOf{
                children: [%Literal{satisfied?: false}]
              }) == false
     end
@@ -176,7 +176,7 @@ defmodule SpekTest do
       ]
 
       for {v1, v2, expected} <- test_cases do
-        assert Spek.eval?(%Or{
+        assert Spek.eval?(%AnyOf{
                  children: [
                    %Literal{satisfied?: v1},
                    %Literal{satisfied?: v2}
@@ -443,22 +443,22 @@ defmodule SpekTest do
     end
 
     test "evaluates And without children" do
-      assert Spek.eval_tree(%And{children: []}) ==
+      assert Spek.eval_tree(%AllOf{children: []}) ==
                {:ok,
-                %And{
+                %AllOf{
                   children: [],
                   satisfied?: true
                 }}
     end
 
     test "evaluates And with one child" do
-      assert Spek.eval_tree(%And{
+      assert Spek.eval_tree(%AllOf{
                children: [
                  %Check{module: Checks, fun: :return_arg, args: [:ok]}
                ]
              }) ==
                {:ok,
-                %And{
+                %AllOf{
                   children: [
                     %Check{
                       module: Checks,
@@ -472,13 +472,13 @@ defmodule SpekTest do
                 }}
 
       assert {:error, %EvaluationError{expression: expression}} =
-               Spek.eval_tree(%And{
+               Spek.eval_tree(%AllOf{
                  children: [
                    %Check{module: Checks, fun: :return_arg, args: [:error]}
                  ]
                })
 
-      assert expression == %And{
+      assert expression == %AllOf{
                children: [
                  %Check{
                    module: Checks,
@@ -494,14 +494,14 @@ defmodule SpekTest do
 
     test "evaluates And with two children" do
       # all checks true
-      assert Spek.eval_tree(%And{
+      assert Spek.eval_tree(%AllOf{
                children: [
                  %Check{module: Checks, fun: :return_arg, args: [:ok]},
                  %Check{module: Checks, fun: :return_arg, args: [true]}
                ]
              }) ==
                {:ok,
-                %And{
+                %AllOf{
                   children: [
                     %Check{
                       module: Checks,
@@ -523,14 +523,14 @@ defmodule SpekTest do
 
       # first check true, second check false
       assert {:error, %EvaluationError{expression: expression}} =
-               Spek.eval_tree(%And{
+               Spek.eval_tree(%AllOf{
                  children: [
                    %Check{module: Checks, fun: :return_arg, args: [:ok]},
                    %Check{module: Checks, fun: :return_arg, args: [false]}
                  ]
                })
 
-      assert expression == %And{
+      assert expression == %AllOf{
                children: [
                  %Check{
                    module: Checks,
@@ -552,14 +552,14 @@ defmodule SpekTest do
 
       # first checks false; second check shouldn't have been evaluated
       assert {:error, %EvaluationError{expression: expression}} =
-               Spek.eval_tree(%And{
+               Spek.eval_tree(%AllOf{
                  children: [
                    %Check{module: Checks, fun: :return_arg, args: [:error]},
                    %Check{module: Checks, fun: :return_arg, args: [true]}
                  ]
                })
 
-      assert expression == %And{
+      assert expression == %AllOf{
                children: [
                  %Check{
                    module: Checks,
@@ -575,22 +575,22 @@ defmodule SpekTest do
 
     test "evaluates Or without children" do
       assert {:error, %EvaluationError{expression: expression}} =
-               Spek.eval_tree(%Or{children: []})
+               Spek.eval_tree(%AnyOf{children: []})
 
-      assert expression == %Or{
+      assert expression == %AnyOf{
                children: [],
                satisfied?: false
              }
     end
 
     test "evaluates Or with one child" do
-      assert Spek.eval_tree(%Or{
+      assert Spek.eval_tree(%AnyOf{
                children: [
                  %Check{module: Checks, fun: :return_arg, args: [:ok]}
                ]
              }) ==
                {:ok,
-                %Or{
+                %AnyOf{
                   children: [
                     %Check{
                       module: Checks,
@@ -604,13 +604,13 @@ defmodule SpekTest do
                 }}
 
       assert {:error, %EvaluationError{expression: expression}} =
-               Spek.eval_tree(%Or{
+               Spek.eval_tree(%AnyOf{
                  children: [
                    %Check{module: Checks, fun: :return_arg, args: [:error]}
                  ]
                })
 
-      assert expression == %Or{
+      assert expression == %AnyOf{
                children: [
                  %Check{
                    module: Checks,
@@ -626,14 +626,14 @@ defmodule SpekTest do
 
     test "evaluates Or with two children" do
       # first check true, second check shouldn't have been evaluated
-      assert Spek.eval_tree(%Or{
+      assert Spek.eval_tree(%AnyOf{
                children: [
                  %Check{module: Checks, fun: :return_arg, args: [:ok]},
                  %Check{module: Checks, fun: :return_arg, args: [:error]}
                ]
              }) ==
                {:ok,
-                %Or{
+                %AnyOf{
                   children: [
                     %Check{
                       module: Checks,
@@ -647,14 +647,14 @@ defmodule SpekTest do
                 }}
 
       # first check false, second check true
-      assert Spek.eval_tree(%Or{
+      assert Spek.eval_tree(%AnyOf{
                children: [
                  %Check{module: Checks, fun: :return_arg, args: [:error]},
                  %Check{module: Checks, fun: :return_arg, args: [:ok]}
                ]
              }) ==
                {:ok,
-                %Or{
+                %AnyOf{
                   children: [
                     %Check{
                       module: Checks,
@@ -676,14 +676,14 @@ defmodule SpekTest do
 
       # all checks false
       assert {:error, %EvaluationError{expression: expression}} =
-               Spek.eval_tree(%Or{
+               Spek.eval_tree(%AnyOf{
                  children: [
                    %Check{module: Checks, fun: :return_arg, args: [:error]},
                    %Check{module: Checks, fun: :return_arg, args: [false]}
                  ]
                })
 
-      assert expression == %Or{
+      assert expression == %AnyOf{
                children: [
                  %Check{
                    module: Checks,

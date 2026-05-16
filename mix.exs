@@ -82,7 +82,7 @@ defmodule Spek.MixProject do
       source_ref: @version,
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
       groups_for_modules: [
-        structs: [Spek.And, Spek.Check, Spek.Literal, Spek.Not, Spek.Or]
+        structs: [Spek.AllOf, Spek.Check, Spek.Literal, Spek.Not, Spek.AnyOf]
       ],
       groups_for_docs: [
         "Builder Functions": &(&1[:type] == :builder),
