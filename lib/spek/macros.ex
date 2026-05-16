@@ -184,8 +184,13 @@ defmodule Spek.Macros do
     check_fun_name = :"#{name}_check"
     predicate_fun_name = :"#{name}?"
 
+    arg_types =
+      for _ <- call_args do
+        quote(do: term())
+      end
+
     quote do
-      @spec unquote(check_fun_name)() :: Spek.Check.t()
+      @spec unquote(check_fun_name)(Spek.context()) :: Spek.Check.t()
       def unquote(check_fun_name)(args \\ unquote(check_args)) do
         %Spek.Check{
           module: unquote(module),
@@ -194,10 +199,14 @@ defmodule Spek.Macros do
         }
       end
 
+      @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
+              boolean()
       def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
         unquote(body)
       end
 
+      @spec unquote(name)(unquote_splicing(arg_types)) ::
+              :ok | {:error, unquote(reason)}
       def unquote(name)(unquote_splicing(call_args)) do
         if unquote(predicate_fun_name)(unquote_splicing(call_args)),
           do: :ok,
