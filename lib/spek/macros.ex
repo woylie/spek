@@ -41,7 +41,7 @@ defmodule Spek.Macros do
     function_name = :"#{fun}_check"
 
     quote do
-      @spec unquote(function_name)() :: Spec.Check.t()
+      @spec unquote(function_name)() :: Spek.Check.t()
       def unquote(function_name)(args \\ unquote(args)) do
         %Spek.Check{
           module: unquote(module),
@@ -185,7 +185,7 @@ defmodule Spek.Macros do
     predicate_fun_name = :"#{name}?"
 
     quote do
-      @spec unquote(check_fun_name)() :: Spec.Check.t()
+      @spec unquote(check_fun_name)() :: Spek.Check.t()
       def unquote(check_fun_name)(args \\ unquote(check_args)) do
         %Spek.Check{
           module: unquote(module),
