@@ -704,4 +704,548 @@ defmodule SpekTest do
              }
     end
   end
+
+  describe "optimize/1" do
+    test "returns Literal unchanged" do
+      literal = %Literal{satisfied?: true}
+      assert Spek.optimize(literal) == literal
+    end
+
+    test "returns Check unchanged" do
+      check = %Check{module: MyModule, fun: :role, args: []}
+      assert Spek.optimize(check) == check
+    end
+
+    test "removes nested not" do
+      assert Spek.optimize(%Not{
+               expression: %Not{expression: %Check{fun: :two_factor}}
+             }) == %Check{fun: :two_factor}
+    end
+
+    test "resolves not on literals" do
+      assert Spek.optimize(%Not{expression: %Literal{satisfied?: true}}) ==
+               %Literal{satisfied?: false}
+
+      assert Spek.optimize(%Not{expression: %Literal{satisfied?: false}}) ==
+               %Literal{satisfied?: true}
+    end
+
+    test "pushes down Not in AllOf" do
+      assert Spek.optimize(%Not{
+               expression: %AllOf{
+                 children: [%Check{fun: :suspended}, %Check{fun: :unverified}]
+               }
+             }) ==
+               %AnyOf{
+                 children: [
+                   %Not{expression: %Check{fun: :suspended}},
+                   %Not{expression: %Check{fun: :unverified}}
+                 ]
+               }
+    end
+
+    test "pushes down Not in AnyOf" do
+      assert Spek.optimize(%Not{
+               expression: %AnyOf{
+                 children: [%Check{fun: :suspended}, %Check{fun: :unverified}]
+               }
+             }) ==
+               %AllOf{
+                 children: [
+                   %Not{expression: %Check{fun: :suspended}},
+                   %Not{expression: %Check{fun: :unverified}}
+                 ]
+               }
+    end
+
+    test "converts AllOf without children to true Literal" do
+      assert Spek.optimize(%AllOf{children: []}) == %Literal{satisfied?: true}
+    end
+
+    test "converts AnyOf without children to false Literal" do
+      assert Spek.optimize(%AnyOf{children: []}) == %Literal{
+               satisfied?: false
+             }
+    end
+
+    test "unwraps AllOf with a single child" do
+      check = %Check{fun: :role, args: []}
+      assert Spek.optimize(%AllOf{children: [check]}) == check
+    end
+
+    test "applies optimization on unwrapped AllOf child and on result" do
+      assert Spek.optimize(%AllOf{children: [%AnyOf{children: []}]}) ==
+               %Literal{satisfied?: false}
+    end
+
+    test "unwraps anyOf with a single child" do
+      check = %Check{fun: :role, args: []}
+      assert Spek.optimize(%AnyOf{children: [check]}) == check
+    end
+
+    test "applies optimization on unwrapped AnyOf child and on result" do
+      assert Spek.optimize(%AnyOf{children: [%AllOf{children: []}]}) ==
+               %Literal{satisfied?: true}
+    end
+
+    test "deduplicates AllOf" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %Check{fun: :role},
+                 %Check{fun: :two_fa},
+                 %Check{fun: :role}
+               ]
+             }) == %AllOf{
+               children: [
+                 %Check{fun: :role},
+                 %Check{fun: :two_fa}
+               ]
+             }
+    end
+
+    test "does not deduplicate AllOf checks with different args" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Check{fun: :role, args: [:clown]}
+               ]
+             }) == %AllOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Check{fun: :role, args: [:clown]}
+               ]
+             }
+    end
+
+    test "optimizes after deduplicating AllOf" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %Literal{satisfied?: true},
+                 %Literal{satisfied?: true}
+               ]
+             }) == %Literal{satisfied?: true}
+    end
+
+    test "unwraps AllOf if one child remains after optimization" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %Literal{satisfied?: true},
+                 %Check{fun: :two_factor}
+               ]
+             }) == %Check{fun: :two_factor}
+    end
+
+    test "deduplicates AnyOf" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %Check{fun: :role},
+                 %Check{fun: :two_fa},
+                 %Check{fun: :role}
+               ]
+             }) == %AnyOf{
+               children: [
+                 %Check{fun: :role},
+                 %Check{fun: :two_fa}
+               ]
+             }
+    end
+
+    test "does not deduplicate AnyOf checks with different args" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Check{fun: :role, args: [:editor]}
+               ]
+             }) == %AnyOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Check{fun: :role, args: [:editor]}
+               ]
+             }
+    end
+
+    test "optimizes after deduplicating AnyOf" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %Literal{satisfied?: true},
+                 %Literal{satisfied?: true}
+               ]
+             }) == %Literal{satisfied?: true}
+
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %Literal{satisfied?: false},
+                 %Literal{satisfied?: false}
+               ]
+             }) == %Literal{satisfied?: false}
+    end
+
+    test "unwraps AnyOf if one child remains after optimization" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %Literal{satisfied?: false},
+                 %Check{fun: :two_factor}
+               ]
+             }) == %Check{fun: :two_factor}
+    end
+
+    test "converts AllOf with false literal to literal" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Literal{satisfied?: false}
+               ]
+             }) == %Literal{satisfied?: false}
+    end
+
+    test "converts AnyOf with true literal to literal" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Literal{satisfied?: true}
+               ]
+             }) == %Literal{satisfied?: true}
+    end
+
+    test "removes true literal from AllOf" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Check{fun: :two_fa},
+                 %Literal{satisfied?: true}
+               ]
+             }) == %AllOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Check{fun: :two_fa}
+               ]
+             }
+    end
+
+    test "removes false literal from AnyOf" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Check{fun: :two_fa},
+                 %Literal{satisfied?: false}
+               ]
+             }) == %AnyOf{
+               children: [
+                 %Check{fun: :role, args: [:admin]},
+                 %Check{fun: :two_fa}
+               ]
+             }
+    end
+
+    test "factorizes AnyOf and collapses single-child factorized branches" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2}
+                   ]
+                 },
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check3},
+                     %Check{fun: :check1}
+                   ]
+                 },
+                 %Check{fun: :check4}
+               ]
+             }) == %AnyOf{
+               children: [
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %AnyOf{
+                       children: [
+                         %Check{fun: :check2},
+                         %Check{fun: :check3}
+                       ]
+                     }
+                   ]
+                 },
+                 %Check{fun: :check4}
+               ]
+             }
+    end
+
+    test "factorizes AnyOf" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2},
+                     %Check{fun: :check3}
+                   ]
+                 },
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check4},
+                     %Check{fun: :check1},
+                     %Check{fun: :check5}
+                   ]
+                 }
+               ]
+             }) == %AllOf{
+               children: [
+                 %Check{fun: :check1},
+                 %AnyOf{
+                   children: [
+                     %AllOf{
+                       children: [
+                         %Check{fun: :check2},
+                         %Check{fun: :check3}
+                       ]
+                     },
+                     %AllOf{
+                       children: [
+                         %Check{fun: :check4},
+                         %Check{fun: :check5}
+                       ]
+                     }
+                   ]
+                 }
+               ]
+             }
+    end
+
+    test "factorizes AnyOf and folds single child left behind" do
+      # (A and B) or A = A
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2}
+                   ]
+                 },
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check1}
+                   ]
+                 }
+               ]
+             }) == %Check{fun: :check1}
+    end
+
+    test "does not factorize AnyOf with single AllOf child" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2}
+                   ]
+                 },
+                 %Check{fun: :check3}
+               ]
+             }) == %AnyOf{
+               children: [
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2}
+                   ]
+                 },
+                 %Check{fun: :check3}
+               ]
+             }
+    end
+
+    test "anyof(allof(A), allof(A)) = A" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check1}
+                   ]
+                 },
+                 %AllOf{
+                   children: [
+                     %Check{fun: :check1}
+                   ]
+                 }
+               ]
+             }) == %Check{fun: :check1}
+    end
+
+    test "factorizes AllOf and collapses single-child factorized branches" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2}
+                   ]
+                 },
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check3},
+                     %Check{fun: :check1}
+                   ]
+                 },
+                 %Check{fun: :check4}
+               ]
+             }) == %AllOf{
+               children: [
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %AllOf{
+                       children: [
+                         %Check{fun: :check2},
+                         %Check{fun: :check3}
+                       ]
+                     }
+                   ]
+                 },
+                 %Check{fun: :check4}
+               ]
+             }
+    end
+
+    test "factorizes AllOf" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2},
+                     %Check{fun: :check3}
+                   ]
+                 },
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check4},
+                     %Check{fun: :check1},
+                     %Check{fun: :check5}
+                   ]
+                 }
+               ]
+             }) == %AnyOf{
+               children: [
+                 %Check{fun: :check1},
+                 %AllOf{
+                   children: [
+                     %AnyOf{
+                       children: [
+                         %Check{fun: :check2},
+                         %Check{fun: :check3}
+                       ]
+                     },
+                     %AnyOf{
+                       children: [
+                         %Check{fun: :check4},
+                         %Check{fun: :check5}
+                       ]
+                     }
+                   ]
+                 }
+               ]
+             }
+    end
+
+    test "factorizes AllOf and folds single child left behind" do
+      # (A or B) and A = A
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2}
+                   ]
+                 },
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check1}
+                   ]
+                 }
+               ]
+             }) == %Check{fun: :check1}
+    end
+
+    test "does not factorize AllOf with single AnyOf child" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2}
+                   ]
+                 },
+                 %Check{fun: :check3}
+               ]
+             }) == %AllOf{
+               children: [
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check1},
+                     %Check{fun: :check2}
+                   ]
+                 },
+                 %Check{fun: :check3}
+               ]
+             }
+    end
+
+    test "allof(anyof(A), anyof(A)) = A" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check1}
+                   ]
+                 },
+                 %AnyOf{
+                   children: [
+                     %Check{fun: :check1}
+                   ]
+                 }
+               ]
+             }) == %Check{fun: :check1}
+    end
+
+    test "A and anyof(B) = A and B" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %Check{fun: :check1},
+                 %AnyOf{children: [%Check{fun: :check2}]}
+               ]
+             }) == %AllOf{
+               children: [%Check{fun: :check1}, %Check{fun: :check2}]
+             }
+    end
+
+    test "allof(anyof(A)) = A" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %AnyOf{children: [%Check{fun: :check1}]}
+               ]
+             }) == %Check{fun: :check1}
+    end
+
+    # | Absorption (OR) | `A or (A and B) = A` |
+    # test "(A and B) or A = A" do
+    #   assert Spek.optimize(%AnyOf{
+    #            children: [
+    #              %AllOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]},
+    #              %Check{fun: :check1}
+    #            ]
+    #          }) == %Check{fun: :check1}
+    # end
+
+    # | Absorption (AND) | `A and (A or B) = A` |
+    # test "(A or B) and A = A" do
+    #   assert Spek.optimize(%AllOf{
+    #            children: [
+    #              %AnyOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]},
+    #              %Check{fun: :check1}
+    #            ]
+    #          }) == %Check{fun: :check1}
+    # end
+  end
 end
