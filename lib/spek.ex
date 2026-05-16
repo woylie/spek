@@ -309,6 +309,20 @@ defmodule Spek do
 
   @doc """
   Lazily evaluates the given expression and returns the result as a boolean.
+
+  ## Examples
+
+      iex> eval?(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hola, amiga"
+      ...> )
+      true
+      
+      iex> eval?(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hello, friend"
+      ...> )
+      false
   """
   @spec eval?(expression, context) :: boolean
   def eval?(expr, context \\ [])
