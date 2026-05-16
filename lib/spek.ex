@@ -324,6 +324,7 @@ defmodule Spek do
       ...> )
       false
   """
+  @doc type: :evaluation
   @spec eval?(expression, context) :: boolean
   def eval?(expr, context \\ [])
 
@@ -369,6 +370,7 @@ defmodule Spek do
       ...> )
       {:error, %Spek.EvaluationError{message: "rule evaluation failed"}}
   """
+  @doc type: :evaluation
   @spec eval(expression, context) :: :ok | {:error, EvaluationError.t()}
   def eval(expression, context \\ []) do
     if eval?(expression, context) do
@@ -396,6 +398,7 @@ defmodule Spek do
       ...> )
       ** (Spek.EvaluationError) rule evaluation failed
   """
+  @doc type: :evaluation
   @spec eval!(expression, context) :: :ok | no_return()
   def eval!(expression, context \\ []) do
     if eval?(expression, context) do
@@ -444,6 +447,7 @@ defmodule Spek do
         }
       }
   """
+  @doc type: :evaluation
   @spec eval_tree(expression, term) ::
           {:ok, expression} | {:error, EvaluationError.t()}
   def eval_tree(expression, context \\ []) do
@@ -483,6 +487,7 @@ defmodule Spek do
       ...> )
       ** (Spek.EvaluationError) rule evaluation failed
   """
+  @doc type: :evaluation
   @spec eval_tree!(expression, term) :: expression | no_return
   def eval_tree!(expression, context \\ []) do
     case do_eval_tree(expression, context) do
@@ -595,6 +600,7 @@ defmodule Spek do
       ...> )
       ["hola, amiga"]
   """
+  @doc type: :evaluation
   @spec filter(Enumerable.t(), expression) :: Enumerable.t()
   def filter(items, expression) do
     Enum.filter(items, &eval?(expression, &1))
@@ -612,6 +618,7 @@ defmodule Spek do
       ...> )
       ["hola, amiga"]
   """
+  @doc type: :evaluation
   @spec reject(Enumerable.t(), expression) :: Enumerable.t()
   def reject(items, expression) do
     Enum.reject(items, &eval?(expression, &1))
