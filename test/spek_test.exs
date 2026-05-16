@@ -111,11 +111,11 @@ defmodule SpekTest do
 
     test "evaluates not" do
       assert Spek.eval?(%Not{
-               expression: %Literal{satisfied?: true, value: :ok}
+               expression: %Literal{satisfied?: true, result: :ok}
              }) == false
 
       assert Spek.eval?(%Not{
-               expression: %Literal{satisfied?: false, value: :error}
+               expression: %Literal{satisfied?: false, result: :error}
              }) == true
     end
 
@@ -125,11 +125,11 @@ defmodule SpekTest do
 
     test "evaluates And with one child" do
       assert Spek.eval?(%And{
-               children: [%Literal{satisfied?: true, value: :ok}]
+               children: [%Literal{satisfied?: true, result: :ok}]
              }) == true
 
       assert Spek.eval?(%And{
-               children: [%Literal{satisfied?: false, value: :error}]
+               children: [%Literal{satisfied?: false, result: :error}]
              }) == false
     end
 

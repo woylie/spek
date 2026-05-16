@@ -97,7 +97,7 @@ defmodule Spek.MacrosTest do
 
     test "can define check without args and opts that is always true" do
       assert Checks.always_true_check() == %Spek.Literal{
-               value: true,
+               result: true,
                satisfied?: true
              }
 
@@ -107,7 +107,7 @@ defmodule Spek.MacrosTest do
 
     test "can define check without args and opts that is always false" do
       assert Checks.always_false_check() == %Spek.Literal{
-               value: false,
+               result: false,
                satisfied?: false
              }
 

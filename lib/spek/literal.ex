@@ -3,7 +3,7 @@ defmodule Spek.Literal do
   Struct that represents an authorization rule that evaluates to a fixed value.
   """
 
-  @type t :: %__MODULE__{satisfied?: boolean, value: Spek.result()}
+  @type t :: %__MODULE__{satisfied?: boolean, result: Spek.result()}
 
-  defstruct [:satisfied?, :value]
+  defstruct [:satisfied?, :result]
 end

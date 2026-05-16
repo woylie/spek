@@ -197,7 +197,7 @@ defmodule Spek.Macros do
         quote do
           @spec unquote(check_fun_name)(Spek.context()) :: Spek.Literal.t()
           def unquote(check_fun_name)(args \\ unquote(check_args)) do
-            %Spek.Literal{value: true, satisfied?: true}
+            %Spek.Literal{result: true, satisfied?: true}
           end
 
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) :: true
@@ -215,7 +215,7 @@ defmodule Spek.Macros do
         quote do
           @spec unquote(check_fun_name)(Spek.context()) :: Spek.Literal.t()
           def unquote(check_fun_name)(args \\ unquote(check_args)) do
-            %Spek.Literal{value: false, satisfied?: false}
+            %Spek.Literal{result: false, satisfied?: false}
           end
 
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
