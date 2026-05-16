@@ -116,18 +116,18 @@ defmodule Spek do
   ## Example
 
       iex> fail()
-      %Spek.Literal{value: false, satisfied?: false}
+      %Spek.Literal{result: false, satisfied?: false}
       
       iex> fail(:error)
-      %Spek.Literal{value: :error, satisfied?: false}
+      %Spek.Literal{result: :error, satisfied?: false}
       
       iex> fail({:error, :some_reason})
-      %Spek.Literal{value: {:error, :some_reason}, satisfied?: false}
+      %Spek.Literal{result: {:error, :some_reason}, satisfied?: false}
   """
   @doc type: :builder
   @spec fail(falsy) :: Literal.t()
-  def fail(value \\ false) do
-    %Literal{value: value, satisfied?: false}
+  def fail(result \\ false) do
+    %Literal{result: result, satisfied?: false}
   end
 
   @doc """
@@ -136,27 +136,27 @@ defmodule Spek do
   ## Examples
 
       iex> literal(true)
-      %Spek.Literal{value: true, satisfied?: true}
+      %Spek.Literal{result: true, satisfied?: true}
       
       iex> literal(:ok)
-      %Spek.Literal{value: :ok, satisfied?: true}
+      %Spek.Literal{result: :ok, satisfied?: true}
 
       iex> literal({:ok, "value"})
-      %Spek.Literal{value: {:ok, "value"}, satisfied?: true}
+      %Spek.Literal{result: {:ok, "value"}, satisfied?: true}
 
       iex> literal(false)
-      %Spek.Literal{value: false, satisfied?: false}
+      %Spek.Literal{result: false, satisfied?: false}
       
       iex> literal(:error)
-      %Spek.Literal{value: :error, satisfied?: false}
+      %Spek.Literal{result: :error, satisfied?: false}
       
       iex> literal({:error, :some_reason})
-      %Spek.Literal{value: {:error, :some_reason}, satisfied?: false}
+      %Spek.Literal{result: {:error, :some_reason}, satisfied?: false}
   """
   @doc type: :builder
   @spec literal(result) :: Literal.t()
-  def literal(value) do
-    %Literal{value: value, satisfied?: to_boolean(value)}
+  def literal(result) do
+    %Literal{result: result, satisfied?: to_boolean(result)}
   end
 
   @doc """
@@ -186,7 +186,7 @@ defmodule Spek do
   ## Examples
 
       iex> negate(literal(true))
-      %Spek.Not{expression: %Spek.Literal{value: true, satisfied?: true}}
+      %Spek.Not{expression: %Spek.Literal{result: true, satisfied?: true}}
 
       iex> negate(check(MyModule, :check_a, []))
       %Spek.Not{
@@ -247,18 +247,18 @@ defmodule Spek do
   ## Example
 
       iex> pass()
-      %Spek.Literal{value: true, satisfied?: true}
+      %Spek.Literal{result: true, satisfied?: true}
       
       iex> pass(:ok)
-      %Spek.Literal{value: :ok, satisfied?: true}
+      %Spek.Literal{result: :ok, satisfied?: true}
       
       iex> pass({:ok, "value"})
-      %Spek.Literal{value: {:ok, "value"}, satisfied?: true}
+      %Spek.Literal{result: {:ok, "value"}, satisfied?: true}
   """
   @doc type: :builder
   @spec pass(truthy) :: Literal.t()
-  def pass(value \\ true) do
-    %Literal{value: value, satisfied?: true}
+  def pass(result \\ true) do
+    %Literal{result: result, satisfied?: true}
   end
 
   @doc """
