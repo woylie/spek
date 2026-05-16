@@ -11,6 +11,8 @@ defmodule Spek do
 
   @type expression :: And.t() | Or.t() | Check.t() | Literal.t() | Not.t()
 
+  @type context :: term
+
   @type truthy :: true | :ok | {:ok, term}
   @type falsy :: false | :error | {:error, term}
   @type result :: truthy | falsy
@@ -307,7 +309,7 @@ defmodule Spek do
   @doc """
   Lazily evaluates the given expression and returns the result as a boolean.
   """
-  @spec eval?(expression, term) :: boolean
+  @spec eval?(expression, context) :: boolean
   def eval?(expr, context \\ [])
 
   def eval?(%Literal{satisfied?: satisfied?}, _) do
