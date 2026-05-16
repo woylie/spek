@@ -406,30 +406,74 @@ defmodule Spek do
   end
 
   @doc """
-  Lazily evaluates the given expression and the evaluated expressions until a
-  decision was made.
-  """
-  @spec eval_tree(expression, term) :: expression
-  def eval_tree(expr, context \\ [])
+  Lazily evaluates the given expression and returns the evaluated part of the
+  expression.
 
-  def eval_tree(%Literal{} = literal, _) do
+  ## Examples
+
+      iex> eval_tree(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hola, amiga"
+      ...> )
+      {
+        :ok,
+        %Spek.Check{
+          module: String,
+          fun: :starts_with?,
+          args: [:ctx, "hola"],
+          result: true,
+          satisfied?: true
+        }
+      }
+      
+      iex> eval_tree(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hello, friend"
+      ...> )
+      {
+        :error,
+        %Spek.EvaluationError{
+          expression: %Spek.Check{
+            args: [:ctx, "hola"],
+            fun: :starts_with?,
+            module: String,
+            result: false,
+            satisfied?: false
+          },
+          message: "rule evaluation failed"
+        }
+      }
+  """
+  @spec eval_tree(expression, term) ::
+          {:ok, expression} | {:error, EvaluationError.t()}
+  def eval_tree(expression, context \\ []) do
+    case do_eval_tree(expression, context) do
+      %{satisfied?: true} = evaluated_expression ->
+        {:ok, evaluated_expression}
+
+      %{satisfied?: false} = evaluated_expression ->
+        {:error, EvaluationError.with_expression(evaluated_expression)}
+    end
+  end
+
+  defp do_eval_tree(%Literal{} = literal, _) do
     literal
   end
 
-  def eval_tree(
-        %Check{module: module, fun: fun, args: args} = check,
-        context
-      ) do
+  defp do_eval_tree(
+         %Check{module: module, fun: fun, args: args} = check,
+         context
+       ) do
     result = apply(module, fun, replace_args(args, context))
     %{check | result: result, satisfied?: Spek.to_boolean(result)}
   end
 
-  def eval_tree(
-        %Not{expression: expression} = not_expr,
-        context
-      ) do
+  defp do_eval_tree(
+         %Not{expression: expression} = not_expr,
+         context
+       ) do
     evaluated_expression =
-      eval_tree(expression, context)
+      do_eval_tree(expression, context)
 
     %{
       not_expr
@@ -438,10 +482,10 @@ defmodule Spek do
     }
   end
 
-  def eval_tree(
-        %And{children: children} = and_,
-        context
-      ) do
+  defp do_eval_tree(
+         %And{children: children} = and_,
+         context
+       ) do
     {satisfied?, evaluated_children} =
       Enum.reduce_while(
         children,
@@ -452,10 +496,10 @@ defmodule Spek do
     %{and_ | satisfied?: satisfied?, children: Enum.reverse(evaluated_children)}
   end
 
-  def eval_tree(
-        %Or{children: children} = or_,
-        context
-      ) do
+  defp do_eval_tree(
+         %Or{children: children} = or_,
+         context
+       ) do
     {satisfied?, evaluated_children} =
       Enum.reduce_while(
         children,
@@ -467,14 +511,14 @@ defmodule Spek do
   end
 
   defp and_reducer(expression, {_, acc}, context) do
-    case eval_tree(expression, context) do
+    case do_eval_tree(expression, context) do
       %{satisfied?: true} = expr -> {:cont, {true, [expr | acc]}}
       %{satisfied?: false} = expr -> {:halt, {false, [expr | acc]}}
     end
   end
 
   defp any_of_reducer(expression, {_, acc}, context) do
-    case eval_tree(expression, context) do
+    case do_eval_tree(expression, context) do
       %{satisfied?: true} = expr -> {:halt, {true, [expr | acc]}}
       %{satisfied?: false} = expr -> {:cont, {false, [expr | acc]}}
     end

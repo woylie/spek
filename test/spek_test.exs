@@ -4,6 +4,7 @@ defmodule SpekTest do
   alias Spek.And
   alias Spek.Check
   alias Spek.Checks
+  alias Spek.EvaluationError
   alias Spek.Literal
   alias Spek.Not
   alias Spek.Or
@@ -188,9 +189,12 @@ defmodule SpekTest do
   describe "eval_tree/2" do
     test "evaluates literal" do
       assert Spek.eval_tree(%Literal{satisfied?: true}) ==
-               %Literal{satisfied?: true}
+               {:ok, %Literal{satisfied?: true}}
 
-      assert Spek.eval_tree(%Literal{satisfied?: false}) ==
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(%Literal{satisfied?: false})
+
+      assert expression ==
                %Literal{satisfied?: false}
     end
 
@@ -199,19 +203,24 @@ defmodule SpekTest do
                module: Checks,
                fun: :always_true,
                args: []
-             }) == %Check{
-               module: Checks,
-               fun: :always_true,
-               args: [],
-               satisfied?: true,
-               result: true
-             }
+             }) ==
+               {:ok,
+                %Check{
+                  module: Checks,
+                  fun: :always_true,
+                  args: [],
+                  satisfied?: true,
+                  result: true
+                }}
 
-      assert Spek.eval_tree(%Check{
-               module: Checks,
-               fun: :always_false,
-               args: []
-             }) == %Check{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(%Check{
+                 module: Checks,
+                 fun: :always_false,
+                 args: []
+               })
+
+      assert expression == %Check{
                module: Checks,
                fun: :always_false,
                args: [],
@@ -230,17 +239,27 @@ defmodule SpekTest do
       ]
 
       for {value, expected_result} <- test_cases do
-        assert Spek.eval_tree(%Check{
-                 module: Checks,
-                 fun: :return_arg,
-                 args: [value]
-               }) == %Check{
-                 module: Checks,
-                 fun: :return_arg,
-                 args: [value],
-                 satisfied?: expected_result,
-                 result: value
-               }
+        result =
+          Spek.eval_tree(%Check{
+            module: Checks,
+            fun: :return_arg,
+            args: [value]
+          })
+
+        expected_expression = %Check{
+          module: Checks,
+          fun: :return_arg,
+          args: [value],
+          satisfied?: expected_result,
+          result: value
+        }
+
+        if expected_result do
+          assert result == {:ok, expected_expression}
+        else
+          assert {:error, %EvaluationError{expression: ^expected_expression}} =
+                   result
+        end
       end
     end
 
@@ -252,22 +271,27 @@ defmodule SpekTest do
                  args: [:ctx]
                },
                %{result: true}
-             ) == %Check{
-               module: Checks,
-               fun: :from_result_key,
-               args: [:ctx],
-               result: true,
-               satisfied?: true
-             }
+             ) ==
+               {:ok,
+                %Check{
+                  module: Checks,
+                  fun: :from_result_key,
+                  args: [:ctx],
+                  result: true,
+                  satisfied?: true
+                }}
 
-      assert Spek.eval_tree(
-               %Check{
-                 module: Checks,
-                 fun: :from_result_key,
-                 args: [:ctx]
-               },
-               %{result: false}
-             ) == %Check{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(
+                 %Check{
+                   module: Checks,
+                   fun: :from_result_key,
+                   args: [:ctx]
+                 },
+                 %{result: false}
+               )
+
+      assert expression == %Check{
                module: Checks,
                fun: :from_result_key,
                args: [:ctx],
@@ -284,22 +308,27 @@ defmodule SpekTest do
                  args: [{:ctx, :result}]
                },
                %{result: true}
-             ) == %Check{
-               module: Checks,
-               fun: :from_bool,
-               args: [{:ctx, :result}],
-               result: :ok,
-               satisfied?: true
-             }
+             ) ==
+               {:ok,
+                %Check{
+                  module: Checks,
+                  fun: :from_bool,
+                  args: [{:ctx, :result}],
+                  result: :ok,
+                  satisfied?: true
+                }}
 
-      assert Spek.eval_tree(
-               %Check{
-                 module: Checks,
-                 fun: :from_bool,
-                 args: [{:ctx, :result}]
-               },
-               %{result: false}
-             ) == %Check{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(
+                 %Check{
+                   module: Checks,
+                   fun: :from_bool,
+                   args: [{:ctx, :result}]
+                 },
+                 %{result: false}
+               )
+
+      assert expression == %Check{
                module: Checks,
                fun: :from_bool,
                args: [{:ctx, :result}],
@@ -316,22 +345,27 @@ defmodule SpekTest do
                  args: [{:ctx, :result}]
                },
                result: true
-             ) == %Check{
-               module: Checks,
-               fun: :from_bool,
-               args: [{:ctx, :result}],
-               result: :ok,
-               satisfied?: true
-             }
+             ) ==
+               {:ok,
+                %Check{
+                  module: Checks,
+                  fun: :from_bool,
+                  args: [{:ctx, :result}],
+                  result: :ok,
+                  satisfied?: true
+                }}
 
-      assert Spek.eval_tree(
-               %Check{
-                 module: Checks,
-                 fun: :from_bool,
-                 args: [{:ctx, :result}]
-               },
-               result: false
-             ) == %Check{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(
+                 %Check{
+                   module: Checks,
+                   fun: :from_bool,
+                   args: [{:ctx, :result}]
+                 },
+                 result: false
+               )
+
+      assert expression == %Check{
                module: Checks,
                fun: :from_bool,
                args: [{:ctx, :result}],
@@ -341,32 +375,40 @@ defmodule SpekTest do
     end
 
     test "evaluates not with literal" do
-      assert Spek.eval_tree(%Not{
-               expression: %Literal{satisfied?: true}
-             }) == %Not{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(%Not{
+                 expression: %Literal{satisfied?: true}
+               })
+
+      assert expression == %Not{
                expression: %Literal{satisfied?: true},
                satisfied?: false
              }
 
       assert Spek.eval_tree(%Not{
                expression: %Literal{satisfied?: false}
-             }) == %Not{
-               expression: %Literal{satisfied?: false},
-               satisfied?: true
-             }
+             }) ==
+               {:ok,
+                %Not{
+                  expression: %Literal{satisfied?: false},
+                  satisfied?: true
+                }}
     end
 
     test "evaluates not with check" do
-      assert Spek.eval_tree(
-               %Not{
-                 expression: %Check{
-                   module: Checks,
-                   fun: :return_arg,
-                   args: [{:ctx, :result}]
-                 }
-               },
-               result: :ok
-             ) == %Not{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(
+                 %Not{
+                   expression: %Check{
+                     module: Checks,
+                     fun: :return_arg,
+                     args: [{:ctx, :result}]
+                   }
+                 },
+                 result: :ok
+               )
+
+      assert expression == %Not{
                expression: %Check{
                  satisfied?: true,
                  module: Checks,
@@ -386,23 +428,27 @@ defmodule SpekTest do
                  }
                },
                result: {:error, :failed}
-             ) == %Not{
-               expression: %Check{
-                 satisfied?: false,
-                 module: Checks,
-                 fun: :return_arg,
-                 args: [{:ctx, :result}],
-                 result: {:error, :failed}
-               },
-               satisfied?: true
-             }
+             ) ==
+               {:ok,
+                %Not{
+                  expression: %Check{
+                    satisfied?: false,
+                    module: Checks,
+                    fun: :return_arg,
+                    args: [{:ctx, :result}],
+                    result: {:error, :failed}
+                  },
+                  satisfied?: true
+                }}
     end
 
     test "evaluates And without children" do
-      assert Spek.eval_tree(%And{children: []}) == %And{
-               children: [],
-               satisfied?: true
-             }
+      assert Spek.eval_tree(%And{children: []}) ==
+               {:ok,
+                %And{
+                  children: [],
+                  satisfied?: true
+                }}
     end
 
     test "evaluates And with one child" do
@@ -410,24 +456,29 @@ defmodule SpekTest do
                children: [
                  %Check{module: Checks, fun: :return_arg, args: [:ok]}
                ]
-             }) == %And{
-               children: [
-                 %Check{
-                   module: Checks,
-                   fun: :return_arg,
-                   args: [:ok],
-                   result: :ok,
-                   satisfied?: true
-                 }
-               ],
-               satisfied?: true
-             }
+             }) ==
+               {:ok,
+                %And{
+                  children: [
+                    %Check{
+                      module: Checks,
+                      fun: :return_arg,
+                      args: [:ok],
+                      result: :ok,
+                      satisfied?: true
+                    }
+                  ],
+                  satisfied?: true
+                }}
 
-      assert Spek.eval_tree(%And{
-               children: [
-                 %Check{module: Checks, fun: :return_arg, args: [:error]}
-               ]
-             }) == %And{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(%And{
+                 children: [
+                   %Check{module: Checks, fun: :return_arg, args: [:error]}
+                 ]
+               })
+
+      assert expression == %And{
                children: [
                  %Check{
                    module: Checks,
@@ -448,33 +499,38 @@ defmodule SpekTest do
                  %Check{module: Checks, fun: :return_arg, args: [:ok]},
                  %Check{module: Checks, fun: :return_arg, args: [true]}
                ]
-             }) == %And{
-               children: [
-                 %Check{
-                   module: Checks,
-                   fun: :return_arg,
-                   args: [:ok],
-                   result: :ok,
-                   satisfied?: true
-                 },
-                 %Check{
-                   module: Checks,
-                   fun: :return_arg,
-                   args: [true],
-                   result: true,
-                   satisfied?: true
-                 }
-               ],
-               satisfied?: true
-             }
+             }) ==
+               {:ok,
+                %And{
+                  children: [
+                    %Check{
+                      module: Checks,
+                      fun: :return_arg,
+                      args: [:ok],
+                      result: :ok,
+                      satisfied?: true
+                    },
+                    %Check{
+                      module: Checks,
+                      fun: :return_arg,
+                      args: [true],
+                      result: true,
+                      satisfied?: true
+                    }
+                  ],
+                  satisfied?: true
+                }}
 
       # first check true, second check false
-      assert Spek.eval_tree(%And{
-               children: [
-                 %Check{module: Checks, fun: :return_arg, args: [:ok]},
-                 %Check{module: Checks, fun: :return_arg, args: [false]}
-               ]
-             }) == %And{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(%And{
+                 children: [
+                   %Check{module: Checks, fun: :return_arg, args: [:ok]},
+                   %Check{module: Checks, fun: :return_arg, args: [false]}
+                 ]
+               })
+
+      assert expression == %And{
                children: [
                  %Check{
                    module: Checks,
@@ -495,12 +551,15 @@ defmodule SpekTest do
              }
 
       # first checks false; second check shouldn't have been evaluated
-      assert Spek.eval_tree(%And{
-               children: [
-                 %Check{module: Checks, fun: :return_arg, args: [:error]},
-                 %Check{module: Checks, fun: :return_arg, args: [true]}
-               ]
-             }) == %And{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(%And{
+                 children: [
+                   %Check{module: Checks, fun: :return_arg, args: [:error]},
+                   %Check{module: Checks, fun: :return_arg, args: [true]}
+                 ]
+               })
+
+      assert expression == %And{
                children: [
                  %Check{
                    module: Checks,
@@ -515,7 +574,10 @@ defmodule SpekTest do
     end
 
     test "evaluates Or without children" do
-      assert Spek.eval_tree(%Or{children: []}) == %Or{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(%Or{children: []})
+
+      assert expression == %Or{
                children: [],
                satisfied?: false
              }
@@ -526,24 +588,29 @@ defmodule SpekTest do
                children: [
                  %Check{module: Checks, fun: :return_arg, args: [:ok]}
                ]
-             }) == %Or{
-               children: [
-                 %Check{
-                   module: Checks,
-                   fun: :return_arg,
-                   args: [:ok],
-                   result: :ok,
-                   satisfied?: true
-                 }
-               ],
-               satisfied?: true
-             }
+             }) ==
+               {:ok,
+                %Or{
+                  children: [
+                    %Check{
+                      module: Checks,
+                      fun: :return_arg,
+                      args: [:ok],
+                      result: :ok,
+                      satisfied?: true
+                    }
+                  ],
+                  satisfied?: true
+                }}
 
-      assert Spek.eval_tree(%Or{
-               children: [
-                 %Check{module: Checks, fun: :return_arg, args: [:error]}
-               ]
-             }) == %Or{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(%Or{
+                 children: [
+                   %Check{module: Checks, fun: :return_arg, args: [:error]}
+                 ]
+               })
+
+      assert expression == %Or{
                children: [
                  %Check{
                    module: Checks,
@@ -564,18 +631,20 @@ defmodule SpekTest do
                  %Check{module: Checks, fun: :return_arg, args: [:ok]},
                  %Check{module: Checks, fun: :return_arg, args: [:error]}
                ]
-             }) == %Or{
-               children: [
-                 %Check{
-                   module: Checks,
-                   fun: :return_arg,
-                   args: [:ok],
-                   result: :ok,
-                   satisfied?: true
-                 }
-               ],
-               satisfied?: true
-             }
+             }) ==
+               {:ok,
+                %Or{
+                  children: [
+                    %Check{
+                      module: Checks,
+                      fun: :return_arg,
+                      args: [:ok],
+                      result: :ok,
+                      satisfied?: true
+                    }
+                  ],
+                  satisfied?: true
+                }}
 
       # first check false, second check true
       assert Spek.eval_tree(%Or{
@@ -583,33 +652,38 @@ defmodule SpekTest do
                  %Check{module: Checks, fun: :return_arg, args: [:error]},
                  %Check{module: Checks, fun: :return_arg, args: [:ok]}
                ]
-             }) == %Or{
-               children: [
-                 %Check{
-                   module: Checks,
-                   fun: :return_arg,
-                   args: [:error],
-                   result: :error,
-                   satisfied?: false
-                 },
-                 %Check{
-                   module: Checks,
-                   fun: :return_arg,
-                   args: [:ok],
-                   result: :ok,
-                   satisfied?: true
-                 }
-               ],
-               satisfied?: true
-             }
+             }) ==
+               {:ok,
+                %Or{
+                  children: [
+                    %Check{
+                      module: Checks,
+                      fun: :return_arg,
+                      args: [:error],
+                      result: :error,
+                      satisfied?: false
+                    },
+                    %Check{
+                      module: Checks,
+                      fun: :return_arg,
+                      args: [:ok],
+                      result: :ok,
+                      satisfied?: true
+                    }
+                  ],
+                  satisfied?: true
+                }}
 
       # all checks false
-      assert Spek.eval_tree(%Or{
-               children: [
-                 %Check{module: Checks, fun: :return_arg, args: [:error]},
-                 %Check{module: Checks, fun: :return_arg, args: [false]}
-               ]
-             }) == %Or{
+      assert {:error, %EvaluationError{expression: expression}} =
+               Spek.eval_tree(%Or{
+                 children: [
+                   %Check{module: Checks, fun: :return_arg, args: [:error]},
+                   %Check{module: Checks, fun: :return_arg, args: [false]}
+                 ]
+               })
+
+      assert expression == %Or{
                children: [
                  %Check{
                    module: Checks,
