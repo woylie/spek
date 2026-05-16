@@ -1,4 +1,4 @@
-defmodule Spek.Or do
+defmodule Spek.AnyOf do
   @moduledoc """
   Struct that represents a combination of checks one of which must be true.
 

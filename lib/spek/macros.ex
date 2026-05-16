@@ -31,7 +31,7 @@ defmodule Spek.Macros do
 
   You can then use this function when building complex rules:
 
-      Spek.all([
+      Spek.all_of[
         MyApp.MyModule.active_user_check(),
         # ...
       ])
@@ -118,7 +118,7 @@ defmodule Spek.Macros do
   define complex rules.
 
       def transfer_rule do
-        Spek.and([
+        Spek.all_of([
           account_balanced_check(),
           # additional checks
         ])
@@ -130,7 +130,7 @@ defmodule Spek.Macros do
   that work on different data:
 
       def transfer_rule do
-        Spek.and([
+        Spek.all_of([
           account_balanced_check([{:ctx, :account}]),
           # additional checks
         ])
