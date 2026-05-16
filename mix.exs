@@ -81,6 +81,9 @@ defmodule Spek.MixProject do
       extras: ["README.md", "CHANGELOG.md"],
       source_ref: @version,
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
+      groups_for_modules: [
+        structs: [Spek.And, Spek.Check, Spek.Literal, Spek.Not, Spek.Or]
+      ],
       groups_for_docs: [
         "Builder Functions": &(&1[:type] == :builder),
         "Evaluation Functions": &(&1[:type] == :evaluation)
