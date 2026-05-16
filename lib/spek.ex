@@ -5,11 +5,14 @@ defmodule Spek do
 
   alias Spek.And
   alias Spek.Check
+  alias Spek.EvaluationError
   alias Spek.Literal
   alias Spek.Not
   alias Spek.Or
 
   @type expression :: And.t() | Or.t() | Check.t() | Literal.t() | Not.t()
+
+  @type context :: term
 
   @type truthy :: true | :ok | {:ok, term}
   @type falsy :: false | :error | {:error, term}
@@ -306,8 +309,22 @@ defmodule Spek do
 
   @doc """
   Lazily evaluates the given expression and returns the result as a boolean.
+
+  ## Examples
+
+      iex> eval?(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hola, amiga"
+      ...> )
+      true
+      
+      iex> eval?(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hello, friend"
+      ...> )
+      false
   """
-  @spec eval?(expression, term) :: boolean
+  @spec eval?(expression, context) :: boolean
   def eval?(expr, context \\ [])
 
   def eval?(%Literal{satisfied?: satisfied?}, _) do
@@ -333,6 +350,59 @@ defmodule Spek do
 
   def eval?(%Or{children: children}, context) do
     Enum.any?(children, &eval?(&1, context))
+  end
+
+  @doc """
+  Lazily evaluates the given expression and returns `:ok` or an error.
+
+  ## Examples
+
+      iex> eval(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hola, amiga"
+      ...> )
+      :ok
+      
+      iex> eval(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hello, friend"
+      ...> )
+      {:error, %Spek.EvaluationError{message: "rule evaluation failed"}}
+  """
+  @spec eval(expression, context) :: :ok | {:error, EvaluationError.t()}
+  def eval(expression, context \\ []) do
+    if eval?(expression, context) do
+      :ok
+    else
+      {:error, EvaluationError.new()}
+    end
+  end
+
+  @doc """
+  Lazily evaluates the given expression and raises an exception if it is not
+  satisfied.
+
+  ## Examples
+
+      iex> eval!(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hola, amiga"
+      ...> )
+      :ok
+      
+      iex> eval!(
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
+      ...>   "hello, friend"
+      ...> )
+      ** (Spek.EvaluationError) rule evaluation failed
+  """
+  @spec eval!(expression, context) :: :ok | no_return()
+  def eval!(expression, context \\ []) do
+    if eval?(expression, context) do
+      :ok
+    else
+      raise EvaluationError
+    end
   end
 
   @doc """
