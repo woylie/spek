@@ -7,6 +7,165 @@ defmodule Spek do
 
   This module contains all expression builder, evaluation, and optimization
   functions. Please refer to the readme for details.
+
+  ## Example
+
+  Given this check module:
+
+      defmodule DeviceChecks do
+        import Spek.Macros
+
+        defcheck device_online(device, reason: :device_offline) do
+          device.online?
+        end
+
+        defcheck battery_above_20(device, reason: :battery_too_low) do
+          device.battery_level > 20
+        end
+
+        defcheck charging(device) do
+          device.charging?
+        end
+
+        defcheck low_power_mode_enabled(device) do
+          device.low_power_mode?
+        end
+      end
+
+  We can compose, optimize, and evaluate rules like this:
+
+      iex> import Spek
+      iex> battery_safe =
+      ...>   all_of([
+      ...>     DeviceChecks.device_online_check(),
+      ...>     DeviceChecks.battery_above_20_check()
+      ...>   ])
+      iex> charging_safe =
+      ...>   all_of([
+      ...>     DeviceChecks.device_online_check(),
+      ...>     DeviceChecks.charging_check()
+      ...>   ])
+      iex> rule =
+      ...>   any_of([
+      ...>     battery_safe,
+      ...>     charging_safe,
+      ...>     DeviceChecks.low_power_mode_enabled_check()
+      ...>   ])
+      %Spek.AnyOf{
+        children: [
+          %Spek.AllOf{
+            children: [
+              %Spek.Check{
+                module: DeviceChecks,
+                fun: :device_online,
+                args: [:ctx]
+              },
+              %Spek.Check{
+                module: DeviceChecks,
+                fun: :battery_above_20,
+                args: [:ctx]
+              }
+            ]
+          },
+          %Spek.AllOf{
+            children: [
+              %Spek.Check{
+                module: DeviceChecks,
+                fun: :device_online,
+                args: [:ctx]
+              },
+              %Spek.Check{
+                module: DeviceChecks,
+                fun: :charging,
+                args: [:ctx]
+              }
+            ]
+          },
+          %Spek.Check{
+            module: DeviceChecks,
+            fun: :low_power_mode_enabled,
+            args: [:ctx]
+          }
+        ]
+      }
+      iex> rule = optimize(rule)
+      %Spek.AnyOf{
+        children: [
+          %Spek.AllOf{
+            children: [
+              %Spek.Check{
+                module: DeviceChecks,
+                fun: :device_online,
+                args: [:ctx]
+              },
+              %Spek.AnyOf{
+                children: [
+                  %Spek.Check{
+                    module: DeviceChecks,
+                    fun: :battery_above_20,
+                    args: [:ctx]
+                  },
+                  %Spek.Check{
+                    module: DeviceChecks,
+                    fun: :charging,
+                    args: [:ctx]
+                  }
+                ]
+              }
+            ]
+          },
+          %Spek.Check{
+            module: DeviceChecks,
+            fun: :low_power_mode_enabled,
+            args: [:ctx]
+          }
+        ]
+      }
+      iex> device = %{
+      ...>   online?: true,
+      ...>   battery_level: 12,
+      ...>   charging?: false,
+      ...>   low_power_mode?: false
+      ...> }
+      iex> Spek.eval?(rule, device)
+      false
+      iex> device = %{
+      ...>   online?: false,
+      ...>   battery_level: 25,
+      ...>   charging?: false,
+      ...>   low_power_mode?: false
+      ...> }
+      iex> Spek.eval_tree(rule, device)
+      {
+        :error,
+        %Spek.EvaluationError{
+          expression: %Spek.AnyOf{
+            children: [
+              %Spek.AllOf{
+                satisfied?: false,
+                children: [
+                  %Spek.Check{
+                    module: DeviceChecks,
+                    fun: :device_online,
+                    args: [:ctx],
+                    result: {:error, :device_offline},
+                    satisfied?: false
+                  }
+                ]
+              },
+              %Spek.Check{
+                module: DeviceChecks,
+                fun: :low_power_mode_enabled,
+                args: [:ctx],
+                result: {:error, :failed},
+                satisfied?: false
+              }
+            ],
+            satisfied?: false
+          },
+          message: "rule evaluation failed"
+        }
+      }
   """
 
   alias Spek.AllOf

@@ -184,7 +184,17 @@ defmodule Spek.Macros do
   # credo:disable-for-next-line
   defmacro defcheck({name, _, raw_args}, do: body) do
     raw_args = raw_args || []
-    {call_args, opts} = Enum.split(raw_args, length(raw_args) - 1)
+
+    {call_args, opts} =
+      case raw_args do
+        [call_args] ->
+          {call_args, []}
+
+        raw_args when is_list(raw_args) ->
+          Enum.split(raw_args, length(raw_args) - 1)
+      end
+
+    call_args = List.wrap(call_args)
     opts = List.first(opts) || []
 
     reason = Keyword.get(opts, :reason, :failed)
