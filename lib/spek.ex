@@ -848,6 +848,8 @@ defmodule Spek do
   | Deduplication (OR) | `A or A = A` |
   | Factoring OR over AND | `(A and B) or (A and C) = A and (B or C)` |
   | Factoring AND over OR | `(A or B) and (A or C) = A or (B and C)` |
+  | Absorption (OR) | `A or (A and B) = A` |
+  | Absorption (AND) | `A and (A or B) = A` |
   """
   @doc type: :optimization
   @spec optimize(expression) :: expression
@@ -919,6 +921,7 @@ defmodule Spek do
     end
   end
 
+  # credo:disable-for-next-line
   defp do_optimize_all_of(%AllOf{children: [_ | _] = children}) do
     {children, _} =
       Enum.reduce_while(children, {[], MapSet.new()}, fn child, {acc, seen} ->
@@ -926,13 +929,30 @@ defmodule Spek do
 
         cond do
           # allof(A, false) = false
-          literal_false?(child) -> {:halt, {false, nil}}
+          literal_false?(child) ->
+            {:halt, {false, nil}}
+
           # allof(A, B, true) = allof(A, B)
-          literal_true?(child) -> {:cont, {acc, seen}}
+          literal_true?(child) ->
+            {:cont, {acc, seen}}
+
           # allof(A, B, A) = allof(A, B) => skip duplicates
-          MapSet.member?(seen, child) -> {:cont, {acc, seen}}
+          MapSet.member?(seen, child) ->
+            {:cont, {acc, seen}}
+
+          # If this is an AnyOf and we already have seen any of its children,
+          # remove it.
+          # A and (A or B) = A
+          any_of_child_seen?(child, seen) ->
+            {:cont, {acc, seen}}
+
           # otherwise, add child to accumulator
-          true -> {:cont, {[child | acc], MapSet.put(seen, child)}}
+          true ->
+            # remove previously seen AnyOfs that have the current child among
+            # their children
+            # (A or B) and A = A
+            absorbed = reject_any_of_with_child(acc, child)
+            {:cont, {[child | absorbed], MapSet.put(seen, child)}}
         end
       end)
 
@@ -948,6 +968,7 @@ defmodule Spek do
     end
   end
 
+  # credo:disable-for-next-line
   defp do_optimize_any_of(%AnyOf{children: children}) do
     {children, _} =
       Enum.reduce_while(
@@ -958,13 +979,30 @@ defmodule Spek do
 
           cond do
             # anyof(A, true) = true
-            literal_true?(child) -> {:halt, {true, nil}}
+            literal_true?(child) ->
+              {:halt, {true, nil}}
+
             # anyof(A, B, false) = anyof(A, B)
-            literal_false?(child) -> {:cont, {acc, seen}}
+            literal_false?(child) ->
+              {:cont, {acc, seen}}
+
             # anyOf(A, B, A) = anyof(A, B) => skip duplicates
-            MapSet.member?(seen, child) -> {:cont, {acc, seen}}
+            MapSet.member?(seen, child) ->
+              {:cont, {acc, seen}}
+
+            # If this is an AllOf and we already have seen any of its children,
+            # remove it.
+            # A or (A and B) = A
+            all_of_child_seen?(child, seen) ->
+              {:cont, {acc, seen}}
+
             # otherwise, add child to accumulator
-            true -> {:cont, {[child | acc], MapSet.put(seen, child)}}
+            true ->
+              # remove previously seen AllOfs that have the current child among
+              # their  children
+              # (A and B) or A = A
+              absorbed = reject_all_of_with_child(acc, child)
+              {:cont, {[child | absorbed], MapSet.put(seen, child)}}
           end
         end
       )
@@ -986,6 +1024,32 @@ defmodule Spek do
 
   defp literal_false?(%Literal{satisfied?: false}), do: true
   defp literal_false?(_), do: false
+
+  defp reject_all_of_with_child(list, child) do
+    Enum.reject(list, fn
+      %AllOf{children: inner} -> child in inner
+      _ -> false
+    end)
+  end
+
+  defp reject_any_of_with_child(list, child) do
+    Enum.reject(list, fn
+      %AnyOf{children: inner} -> child in inner
+      _ -> false
+    end)
+  end
+
+  defp all_of_child_seen?(%AllOf{children: children}, seen) do
+    Enum.any?(seen, &(&1 in children))
+  end
+
+  defp all_of_child_seen?(_, _), do: false
+
+  defp any_of_child_seen?(%AnyOf{children: children}, seen) do
+    Enum.any?(seen, &(&1 in children))
+  end
+
+  defp any_of_child_seen?(_, _), do: false
 
   defp factorize(%AllOf{children: children} = all_of) do
     # find all AnyOf children; only factorize if there is more than one

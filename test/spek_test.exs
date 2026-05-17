@@ -1289,24 +1289,40 @@ defmodule SpekTest do
              }) == %Check{fun: :check1}
     end
 
-    # | Absorption (OR) | `A or (A and B) = A` |
-    # test "(A and B) or A = A" do
-    #   assert Spek.optimize(%AnyOf{
-    #            children: [
-    #              %AllOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]},
-    #              %Check{fun: :check1}
-    #            ]
-    #          }) == %Check{fun: :check1}
-    # end
+    test "A or (A and B) = A" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %Check{fun: :check1},
+                 %AllOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]}
+               ]
+             }) == %Check{fun: :check1}
+    end
 
-    # | Absorption (AND) | `A and (A or B) = A` |
-    # test "(A or B) and A = A" do
-    #   assert Spek.optimize(%AllOf{
-    #            children: [
-    #              %AnyOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]},
-    #              %Check{fun: :check1}
-    #            ]
-    #          }) == %Check{fun: :check1}
-    # end
+    test "(A and B) or A = A" do
+      assert Spek.optimize(%AnyOf{
+               children: [
+                 %AllOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]},
+                 %Check{fun: :check1}
+               ]
+             }) == %Check{fun: :check1}
+    end
+
+    test "(A or B) and A = A" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %AnyOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]},
+                 %Check{fun: :check1}
+               ]
+             }) == %Check{fun: :check1}
+    end
+
+    test "A and (A or B) = A" do
+      assert Spek.optimize(%AllOf{
+               children: [
+                 %Check{fun: :check1},
+                 %AnyOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]}
+               ]
+             }) == %Check{fun: :check1}
+    end
   end
 end
