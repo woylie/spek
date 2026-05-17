@@ -60,7 +60,7 @@ defmodule Spek.MixProject do
   end
 
   defp description do
-    "Boolean expression engine"
+    "Boolean expression engine for domain rules"
   end
 
   defp package do
