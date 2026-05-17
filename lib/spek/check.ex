@@ -22,7 +22,7 @@ defmodule Spek.Check do
   """
   @type t :: %__MODULE__{
           module: module,
-          fun: fun,
+          fun: atom,
           args: args(),
           result: Spek.result() | nil,
           satisfied?: boolean | nil
