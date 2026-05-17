@@ -39,12 +39,12 @@ end
 
 ## Usage
 
-### Expression structs
+## Expressions
 
-#### Check
+### Check
 
 Start by defining check functions (predicates) for your domain rules. These
-functions can take any kind of input and must returns either a boolean, `:ok`,
+functions can take any kind of input and must return either a boolean, `:ok`,
 `:error`, `{:ok, term}`, or `{:error, term}`.
 
 The example below defines two variants of the same check: The first one returns
@@ -73,9 +73,9 @@ functions is passed directly to the referenced `user_subscribed/1` function.
 More on that later.
 
 A `Spek.Check` struct is a complete expression, but it can be combined with
-other expression structs to express complex rules.
+other expression structs to define complex rules.
 
-#### Literal
+### Literal
 
 The `Spek.Literal` struct always evaluates to a constant value:
 
@@ -103,7 +103,7 @@ the caller.
 %Spek.Literal{result: {:error, :feature_disabled}, satisfied?: false}
 ```
 
-#### Not
+### Not
 
 If we wanted to check that a user is not subscribed, we could write it like
 this:
@@ -118,28 +118,44 @@ this:
 }
 ```
 
-#### AllOf
+### AllOf
 
 Use `Spek.AllOf` to combine checks that _all_ must evaluate to `true`.
 
 ```elixir
 %AllOf{
   children: [
-    %Spek.Check{module: MyApp.UserChecks, fun: :user_active, args: [:ctx]},
-    %Spek.Check{module: MyApp.UserChecks, fun: :user_subscribed, args: [:ctx]}
+    %Spek.Check{
+      module: MyApp.UserChecks,
+      fun: :user_active,
+      args: [:ctx]
+    },
+    %Spek.Check{
+      module: MyApp.UserChecks,
+      fun: :user_subscribed,
+      args: [:ctx]
+    }
   ]
 }
 ```
 
-#### AnyOf
+### AnyOf
 
 Use `Spek.AnyOf` if one of the checks must evaluate to `true`.
 
 ```elixir
 %AnyOf{
   children: [
-    %Spek.Check{module: MyApp.NotificationChecks, fun: :security_notification, args: [{:ctx, :notification}]},
-    %Spek.Check{module: MyApp.UserChecks, fun: :user_subscribed, args: [{:ctx, :user}]}
+    %Spek.Check{
+      module: MyApp.NotificationChecks,
+      fun: :security_notification,
+      args: [{:ctx, :notification}]
+    },
+    %Spek.Check{
+      module: MyApp.UserChecks,
+      fun: :user_subscribed,
+      args: [{:ctx, :user}]
+    }
   ]
 }
 ```
@@ -154,21 +170,37 @@ The expression structs can be arbitrarily combined and nested.
 ```elixir
 %AllOf{
   children: [
-    %Spek.Check{module: MyApp.UserChecks, fun: :user_active, args: [{:ctx, :user}]},
+    %Spek.Check{
+      module: MyApp.UserChecks,
+      fun: :user_active,
+      args: [{:ctx, :user}]
+    },
     %Spek.Not{
-      expression: %Spek.Check{module: MyApp.UserChecks, fun: :user_banned, args: [{:ctx, :user}]}
+      expression: %Spek.Check{
+        module: MyApp.UserChecks,
+        fun: :user_banned,
+        args: [{:ctx, :user}]
+      }
     },
     %AnyOf{
       children: [
-        %Spek.Check{module: MyApp.NotificationChecks, fun: :security_notification, args: [{:ctx, :notification}]},
-        %Spek.Check{module: MyApp.UserChecks, fun: :user_subscribed, args: [{:ctx, :user}]}
+        %Spek.Check{
+          module: MyApp.NotificationChecks,
+          fun: :security_notification,
+          args: [{:ctx, :notification}]
+        },
+        %Spek.Check{
+          module: MyApp.UserChecks,
+          fun: :user_subscribed,
+          args: [{:ctx, :user}]
+        }
       ]
     }
   ]
 }
 ```
 
-### Builder functions
+## Builder functions
 
 Writing out the structs like above is a bit tedious. Spek has builder functions
 for all the structs. Let's rewrite the previous example, and let's also put it
@@ -179,7 +211,7 @@ defmodule MyApp.Rules do
   def send_notification_rule do
     Spek.all_of([
       Spek.check(MyApp.UserChecks, :user_active, [{:ctx, :user}]),
-      Spek.not(
+      Spek.negate(
         Spek.check(MyApp.UserChecks, :user_banned, [{:ctx, :user}])
       ),
       Spek.any_of([
@@ -220,7 +252,6 @@ defmodule MyApp.UserChecks do
     Spek.check(__MODULE__, :user_active, args)
   end
 
-
   def user_subscribed?(%User{subscribed: subscribed}) do
     subscribed
   end
@@ -248,7 +279,7 @@ defmodule MyApp.Rules do
   def send_notification_rule do
     Spek.all_of([
       UserChecks.user_active_check([{:ctx, :user}]),
-      Spek.not(
+      Spek.negate(
         UserChecks.user_banned_check([{:ctx, :user}])
       ),
       Spek.any_of([
@@ -266,13 +297,13 @@ the default `args`.
 ```elixir
 Spek.all_of([
   UserChecks.user_active_check(),
-  Spek.not(
+  Spek.negate(
     UserChecks.user_banned_check()
   )
 ])
 ```
 
-### Check macros
+## Check macros
 
 If we want to make our `UserChecks` module less verbose, we can optionally use
 one of two macros.
@@ -309,9 +340,9 @@ defmodule MyApp.UserChecks do
 end
 ```
 
-If you want to go one step further, you use `Spek.Macros.defcheck/2` to define
-check once and compile it for different use cases. We defined three functions
-for the same predicate above: `user_active?/1`, `user_active/1`, and
+If you want to go one step further, you can use `Spek.Macros.defcheck/2` to
+define a check once and compile it for different use cases. We defined three
+functions for the same predicate above: `user_active?/1`, `user_active/1`, and
 `user_active_check/1`.
 
 ```elixir
@@ -334,19 +365,15 @@ You can replace all of that with:
 defmodule MyApp.UserChecks do
   import Spek.Macros
 
-  defcheck user_active(user, reason: :user_inactive) do
-    user.state == :active
+  defcheck user_active(%User{state: state}, reason: :user_inactive) do
+    state == :active
   end
 end
 ```
 
-There is no restriction for what's in the do-block. The only requirement is
-that it evaluates to a boolean.
+The only requirement for the do-block is that it evaluates to a boolean.
 
-As with `Spek.Macros.build_check/2`, that default for the check's `args` is
-`[:ctx]`, but you can change it for a different value:
-
-So far, all our check functions used a single argument, but there is no
+So far, all our check functions use a single argument, but there is no
 limitation to the number of arguments. For example, if you wanted to define a
 check that ensures that a user belongs to a certain organization, you could do
 it like this:
@@ -388,7 +415,7 @@ to read and understand. The disadvantage is that the implementation details of
 the three generated functions are hidden. The macros are optional, use them at
 your own discretion.
 
-### Evaluation
+## Evaluation
 
 Now that we know how to define check functions and complex rules, we can turn
 to evaluation.
@@ -449,9 +476,9 @@ implement a dynamic rule builder.
 There are two special values that can be used in the check's `args`.
 
 - `:ctx` - Is substituted with the whole context at evaluation time.
-- `{:ctx, key}` - Is substituted with the value from the evaluation context at
-  the given key. The context must be either a map or a keyword list in this
-  case.
+- `{:ctx, key}` - Is substituted with the value at the given key in the
+  evaluation context. The context must be either a map or a keyword list in
+  this case.
 
 Let's see this in an example. We'll use this check module:
 
@@ -470,7 +497,7 @@ def send_notification_rule do
 end
 ```
 
-And then we build a function that does something only if the user is subscribed:
+Then we build a function that does something only if the user is subscribed:
 
 ```elixir
 def send_notification(%User{} = user, %Notification{} = notification) do
@@ -518,10 +545,10 @@ expression is part of the `Spek.EvaluationError` struct.
 | `Spek.eval_tree_all/2`  | `{:ok, Spek.expression()} \| {:error, Spek.EvaluationError.t()}` | no          | yes                          |
 | `Spek.eval_tree_all!/2` | `Spek.expression()` or raises `Spek.EvaluationError.t()`         | no          | yes                          |
 
-### Optimization
+## Optimization
 
 If you reuse and combine multiple rules into larger expressions, you may end up
-with redundant expressions. `Spek.optimize/1` applies boolean algebra
+with redundant checks. `Spek.optimize/1` applies boolean algebra
 transformations to simplify these expressions.
 
 Consider the following example:
@@ -534,16 +561,16 @@ defmodule MyApp.Rules do
 
   def enterprise_export do
     all_of([
-      check(Checks, :account_active?),
-      check(Checks, :user_has_export_permission?),
-      check(Checks, :two_factor_enabled?)
+      check(Checks, :account_active),
+      check(Checks, :user_has_export_permission),
+      check(Checks, :two_factor_enabled)
     ])
   end
 
   def admin_override do
     all_of([
-      check(Checks, :account_active?),
-      check(Checks, :user_is_admin?)
+      check(Checks, :account_active),
+      check(Checks, :user_is_admin)
     ])
   end
 
@@ -551,18 +578,18 @@ defmodule MyApp.Rules do
     any_of([
       all_of([
         enterprise_export(),
-        check(Checks, :gdpr_training_completed?)
+        check(Checks, :gdpr_training_completed)
       ]),
       all_of([
         admin_override(),
-        check(Checks, :gdpr_training_completed?)
+        check(Checks, :gdpr_training_completed)
       ])
     ])
   end
 end
 ```
 
-It defines two simple rules, `enterprise_export` and `admin_override`,
+The module defines two simple rules, `enterprise_export` and `admin_override`,
 and an additional third rule that combines both of them and adds additional
 checks. The return value of the `export_customer_data` function is:
 
@@ -577,24 +604,24 @@ checks. The return value of the `export_customer_data` function is:
           children: [
             %Spek.Check{
               module: MyApp.Checks,
-              fun: :account_active?,
+              fun: :account_active,
               args: [:ctx],
             },
             %Spek.Check{
               module: MyApp.Checks,
-              fun: :user_has_export_permission?,
+              fun: :user_has_export_permission,
               args: [:ctx],
             },
             %Spek.Check{
               module: MyApp.Checks,
-              fun: :two_factor_enabled?,
+              fun: :two_factor_enabled,
               args: [:ctx],
             }
           ]
         },
         %Spek.Check{
           module: MyApp.Checks,
-          fun: :gdpr_training_completed?,
+          fun: :gdpr_training_completed,
           args: [:ctx],
         }
       ]
@@ -605,19 +632,19 @@ checks. The return value of the `export_customer_data` function is:
           children: [
             %Spek.Check{
               module: MyApp.Checks,
-              fun: :account_active?,
+              fun: :account_active,
               args: [:ctx],
             },
             %Spek.Check{
               module: MyApp.Checks,
-              fun: :user_is_admin?,
+              fun: :user_is_admin,
               args: [:ctx],
             }
           ]
         },
         %Spek.Check{
           module: MyApp.Checks,
-          fun: :gdpr_training_completed?,
+          fun: :gdpr_training_completed,
           args: [:ctx],
         }
       ]
@@ -637,14 +664,14 @@ these common checks.
   children: [
     %Spek.Check{
       module: MyApp.Checks,
-      fun: :gdpr_training_completed?,
+      fun: :gdpr_training_completed,
       args: [:ctx],
     },
     %Spek.AllOf{
       children: [
         %Spek.Check{
           module: MyApp.Checks,
-          fun: :account_active?,
+          fun: :account_active,
           args: [:ctx],
         },
         %Spek.AnyOf{
@@ -653,19 +680,19 @@ these common checks.
               children: [
                 %Spek.Check{
                   module: MyApp.Checks,
-                  fun: :user_has_export_permission?,
+                  fun: :user_has_export_permission,
                   args: [:ctx],
                 },
                 %Spek.Check{
                   module: MyApp.Checks,
-                  fun: :two_factor_enabled?,
+                  fun: :two_factor_enabled,
                   args: [:ctx],
                 }
               ]
             },
             %Spek.Check{
               module: MyApp.Checks,
-              fun: :user_is_admin?,
+              fun: :user_is_admin,
               args: [:ctx],
             }
           ]
@@ -686,24 +713,24 @@ defmodule MyApp.Rules do
   alias MyApp.Checks
 
   @enterprise_export all_of([
-                       check(Checks, :account_active?),
-                       check(Checks, :user_has_export_permission?),
-                       check(Checks, :two_factor_enabled?)
+                       check(Checks, :account_active),
+                       check(Checks, :user_has_export_permission),
+                       check(Checks, :two_factor_enabled)
                      ])
 
   @admin_override all_of([
-                    check(Checks, :account_active?),
-                    check(Checks, :user_is_admin?)
+                    check(Checks, :account_active),
+                    check(Checks, :user_is_admin)
                   ])
 
   @export_customer_data any_of([
                           all_of([
                             @enterprise_export,
-                            check(Checks, :gdpr_training_completed?)
+                            check(Checks, :gdpr_training_completed)
                           ]),
                           all_of([
                             @admin_override,
-                            check(Checks, :gdpr_training_completed?)
+                            check(Checks, :gdpr_training_completed)
                           ])
                         ])
 
@@ -725,12 +752,12 @@ defmodule MyApp.Rules do
 
   alias MyApp.Checks
 
-  @feature_enabled? Application.compile_env(:spek, :feature_enabled?, true)
+  @feature_enabled Application.compile_env(:spek, :feature_enabled, true)
 
   @enterprise_export all_of([
-                       check(Checks, :account_active?),
-                       check(Checks, :user_has_export_permission?),
-                       literal(@feature_enabled?)
+                       check(Checks, :account_active),
+                       check(Checks, :user_has_export_permission),
+                       literal(@feature_enabled)
                      ])
   @enterprise_export optimize(@enterprise_export)
 
@@ -743,8 +770,8 @@ If the feature is enabled, the literal is removed from the expression:
 ```elixir
 %Spek.AllOf{
   children: [
-    %Spek.Check{module: MyApp.Checks, fun: :account_active?, args: [:ctx]},
-    %Spek.Check{module: MyApp.Checks, fun: :user_has_export_permission?, args: [:ctx]}
+    %Spek.Check{module: MyApp.Checks, fun: :account_active, args: [:ctx]},
+    %Spek.Check{module: MyApp.Checks, fun: :user_has_export_permission, args: [:ctx]}
   ]
 }
 ```
@@ -757,8 +784,6 @@ If the feature is disabled, the expression is reduced to a single literal:
 
 For more information about the optimizations that are applied, refer to the
 documentation of `Spek.optimize/1`.
-
-## Contributing
 
 ## Related libraries
 
