@@ -798,33 +798,33 @@ defmodule Spek do
       ...>   children: [
       ...>     %AllOf{
       ...>       children: [
-      ...>         %Check{fun: :check1},
-      ...>         %Check{fun: :check2}
+      ...>         %Check{module: MyModule, fun: :check1, args: []},
+      ...>         %Check{module: MyModule, fun: :check2, args: []}
       ...>       ]
       ...>     },
       ...>     %AllOf{
       ...>       children: [
-      ...>         %Check{fun: :check3},
-      ...>         %Check{fun: :check1}
+      ...>         %Check{module: MyModule, fun: :check3, args: []},
+      ...>         %Check{module: MyModule, fun: :check1, args: []}
       ...>       ]
       ...>     },
-      ...>     %Check{fun: :check4}
+      ...>     %Check{module: MyModule, fun: :check4, args: []}
       ...>   ]
       ...> })
       %AnyOf{
         children: [
           %AllOf{
             children: [
-              %Check{fun: :check1},
+              %Check{module: MyModule, fun: :check1, args: []},
               %AnyOf{
                 children: [
-                  %Check{fun: :check2},
-                  %Check{fun: :check3}
+                  %Check{module: MyModule, fun: :check2, args: []},
+                  %Check{module: MyModule, fun: :check3, args: []}
                 ]
               }
             ]
           },
-          %Check{fun: :check4}
+          %Check{module: MyModule, fun: :check4, args: []}
         ]
       }
 
