@@ -106,7 +106,7 @@ defmodule Spek do
   """
   @doc type: :builder
   @spec check(module, fun, Check.args()) :: Check.t()
-  def check(module, fun, args) do
+  def check(module, fun, args \\ [:ctx]) do
     %Check{module: module, fun: fun, args: args}
   end
 
@@ -798,33 +798,33 @@ defmodule Spek do
       ...>   children: [
       ...>     %AllOf{
       ...>       children: [
-      ...>         %Check{fun: :check1},
-      ...>         %Check{fun: :check2}
+      ...>         %Check{module: MyModule, fun: :check1, args: []},
+      ...>         %Check{module: MyModule, fun: :check2, args: []}
       ...>       ]
       ...>     },
       ...>     %AllOf{
       ...>       children: [
-      ...>         %Check{fun: :check3},
-      ...>         %Check{fun: :check1}
+      ...>         %Check{module: MyModule, fun: :check3, args: []},
+      ...>         %Check{module: MyModule, fun: :check1, args: []}
       ...>       ]
       ...>     },
-      ...>     %Check{fun: :check4}
+      ...>     %Check{module: MyModule, fun: :check4, args: []}
       ...>   ]
       ...> })
       %AnyOf{
         children: [
           %AllOf{
             children: [
-              %Check{fun: :check1},
+              %Check{module: MyModule, fun: :check1, args: []},
               %AnyOf{
                 children: [
-                  %Check{fun: :check2},
-                  %Check{fun: :check3}
+                  %Check{module: MyModule, fun: :check2, args: []},
+                  %Check{module: MyModule, fun: :check3, args: []}
                 ]
               }
             ]
           },
-          %Check{fun: :check4}
+          %Check{module: MyModule, fun: :check4, args: []}
         ]
       }
 
@@ -869,7 +869,7 @@ defmodule Spek do
 
       # not(true) == false, not(false) == true
       %Literal{satisfied?: bool} ->
-        %Literal{satisfied?: not bool}
+        %Literal{satisfied?: not bool, result: not bool}
 
       # not (A and B) = (not A) or (not B)
       %AllOf{children: children} ->
@@ -886,7 +886,7 @@ defmodule Spek do
   end
 
   def optimize(%AllOf{children: []}) do
-    %Literal{satisfied?: true}
+    %Literal{satisfied?: true, result: true}
   end
 
   def optimize(%AllOf{children: [child]}) do
@@ -904,7 +904,7 @@ defmodule Spek do
   end
 
   def optimize(%AnyOf{children: []}) do
-    %Literal{satisfied?: false}
+    %Literal{satisfied?: false, result: false}
   end
 
   def optimize(%AnyOf{children: [child]}) do
@@ -958,11 +958,11 @@ defmodule Spek do
 
     case children do
       # wrap false from first condition in reducer
-      false -> %Literal{satisfied?: false}
+      false -> %Literal{satisfied?: false, result: false}
       # allof(A) = A
       [child] -> child
       # allof() = true
-      [] -> %Literal{satisfied?: true}
+      [] -> %Literal{satisfied?: true, result: true}
       # return new allof
       children -> %AllOf{children: Enum.reverse(children)}
     end
@@ -1009,11 +1009,11 @@ defmodule Spek do
 
     case children do
       # wrap true from first condition in reducer
-      true -> %Literal{satisfied?: true}
+      true -> %Literal{satisfied?: true, result: true}
       # anyof(A) = A
       [child] -> child
       # anyof() = false
-      [] -> %Literal{satisfied?: false}
+      [] -> %Literal{satisfied?: false, result: false}
       # return new anyof
       children -> %AnyOf{children: Enum.reverse(children)}
     end
@@ -1116,7 +1116,7 @@ defmodule Spek do
       Enum.map(all_ofs, fn %AllOf{children: children} ->
         case children -- common_expressions do
           # allof() = true
-          [] -> %Literal{satisfied?: true}
+          [] -> %Literal{satisfied?: true, result: true}
           # allof(A) = A
           [child] -> child
           # if there is more than one child, build a new AllOf
@@ -1148,7 +1148,7 @@ defmodule Spek do
       Enum.map(any_ofs, fn %AnyOf{children: children} ->
         case children -- common_expressions do
           # anyof() = false
-          [] -> %Literal{satisfied?: false}
+          [] -> %Literal{satisfied?: false, result: false}
           # anyof(A) = A
           [child] -> child
           # if there is more than one child, build a new AnyOf

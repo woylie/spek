@@ -13,8 +13,8 @@ defmodule SpekTest do
 
   describe "eval?/2" do
     test "evaluates literal" do
-      assert Spek.eval?(%Literal{satisfied?: true}) == true
-      assert Spek.eval?(%Literal{satisfied?: false}) == false
+      assert Spek.eval?(%Literal{satisfied?: true, result: true}) == true
+      assert Spek.eval?(%Literal{satisfied?: false, result: false}) == false
     end
 
     test "evaluates check without arg" do
@@ -145,8 +145,8 @@ defmodule SpekTest do
       for {v1, v2, expected} <- test_cases do
         assert Spek.eval?(%AllOf{
                  children: [
-                   %Literal{satisfied?: v1},
-                   %Literal{satisfied?: v2}
+                   %Literal{satisfied?: v1, result: v1},
+                   %Literal{satisfied?: v2, result: v2}
                  ]
                }) == expected
       end
@@ -158,11 +158,11 @@ defmodule SpekTest do
 
     test "evaluates AnyOf with one child" do
       assert Spek.eval?(%AnyOf{
-               children: [%Literal{satisfied?: true}]
+               children: [%Literal{satisfied?: true, result: true}]
              }) == true
 
       assert Spek.eval?(%AnyOf{
-               children: [%Literal{satisfied?: false}]
+               children: [%Literal{satisfied?: false, result: false}]
              }) == false
     end
 
@@ -178,8 +178,8 @@ defmodule SpekTest do
       for {v1, v2, expected} <- test_cases do
         assert Spek.eval?(%AnyOf{
                  children: [
-                   %Literal{satisfied?: v1},
-                   %Literal{satisfied?: v2}
+                   %Literal{satisfied?: v1, result: v1},
+                   %Literal{satisfied?: v2, result: v2}
                  ]
                }) == expected
       end
@@ -188,14 +188,14 @@ defmodule SpekTest do
 
   describe "eval_tree/2" do
     test "evaluates literal" do
-      assert Spek.eval_tree(%Literal{satisfied?: true}) ==
-               {:ok, %Literal{satisfied?: true}}
+      assert Spek.eval_tree(%Literal{satisfied?: true, result: true}) ==
+               {:ok, %Literal{satisfied?: true, result: true}}
 
       assert {:error, %EvaluationError{expression: expression}} =
-               Spek.eval_tree(%Literal{satisfied?: false})
+               Spek.eval_tree(%Literal{satisfied?: false, result: false})
 
       assert expression ==
-               %Literal{satisfied?: false}
+               %Literal{satisfied?: false, result: false}
     end
 
     test "evaluates check without arg" do
@@ -377,20 +377,20 @@ defmodule SpekTest do
     test "evaluates not with literal" do
       assert {:error, %EvaluationError{expression: expression}} =
                Spek.eval_tree(%Not{
-                 expression: %Literal{satisfied?: true}
+                 expression: %Literal{satisfied?: true, result: true}
                })
 
       assert expression == %Not{
-               expression: %Literal{satisfied?: true},
+               expression: %Literal{satisfied?: true, result: true},
                satisfied?: false
              }
 
       assert Spek.eval_tree(%Not{
-               expression: %Literal{satisfied?: false}
+               expression: %Literal{satisfied?: false, result: false}
              }) ==
                {:ok,
                 %Not{
-                  expression: %Literal{satisfied?: false},
+                  expression: %Literal{satisfied?: false, result: false},
                   satisfied?: true
                 }}
     end
@@ -768,39 +768,64 @@ defmodule SpekTest do
 
   describe "optimize/1" do
     test "returns Literal unchanged" do
-      literal = %Literal{satisfied?: true}
+      literal = %Literal{satisfied?: true, result: true}
       assert Spek.optimize(literal) == literal
     end
 
     test "returns Check unchanged" do
-      check = %Check{module: MyModule, fun: :role, args: []}
+      check = %Check{module: Checks, fun: :role, args: []}
       assert Spek.optimize(check) == check
     end
 
     test "removes nested not" do
       assert Spek.optimize(%Not{
-               expression: %Not{expression: %Check{fun: :two_factor}}
-             }) == %Check{fun: :two_factor}
+               expression: %Not{
+                 expression: %Check{
+                   module: Checks,
+                   fun: :two_factor,
+                   args: []
+                 }
+               }
+             }) == %Check{module: Checks, fun: :two_factor, args: []}
     end
 
     test "resolves not on literals" do
-      assert Spek.optimize(%Not{expression: %Literal{satisfied?: true}}) ==
-               %Literal{satisfied?: false}
+      assert Spek.optimize(%Not{
+               expression: %Literal{satisfied?: true, result: true}
+             }) ==
+               %Literal{satisfied?: false, result: false}
 
-      assert Spek.optimize(%Not{expression: %Literal{satisfied?: false}}) ==
-               %Literal{satisfied?: true}
+      assert Spek.optimize(%Not{
+               expression: %Literal{satisfied?: false, result: false}
+             }) ==
+               %Literal{satisfied?: true, result: true}
     end
 
     test "pushes down Not in AllOf" do
       assert Spek.optimize(%Not{
                expression: %AllOf{
-                 children: [%Check{fun: :suspended}, %Check{fun: :unverified}]
+                 children: [
+                   %Check{module: Checks, fun: :suspended, args: []},
+                   %Check{module: Checks, fun: :unverified, args: []}
+                 ]
                }
              }) ==
                %AnyOf{
                  children: [
-                   %Not{expression: %Check{fun: :suspended}},
-                   %Not{expression: %Check{fun: :unverified}}
+                   %Not{
+                     expression: %Check{
+                       module: Checks,
+                       fun: :suspended,
+                       args: []
+                     }
+                   },
+                   %Not{
+                     expression: %Check{
+                       module: Checks,
+                       fun: :unverified,
+                       args: []
+                     }
+                   }
                  ]
                }
     end
@@ -808,58 +833,77 @@ defmodule SpekTest do
     test "pushes down Not in AnyOf" do
       assert Spek.optimize(%Not{
                expression: %AnyOf{
-                 children: [%Check{fun: :suspended}, %Check{fun: :unverified}]
+                 children: [
+                   %Check{module: Checks, fun: :suspended, args: []},
+                   %Check{module: Checks, fun: :unverified, args: []}
+                 ]
                }
              }) ==
                %AllOf{
                  children: [
-                   %Not{expression: %Check{fun: :suspended}},
-                   %Not{expression: %Check{fun: :unverified}}
+                   %Not{
+                     expression: %Check{
+                       module: Checks,
+                       fun: :suspended,
+                       args: []
+                     }
+                   },
+                   %Not{
+                     expression: %Check{
+                       module: Checks,
+                       fun: :unverified,
+                       args: []
+                     }
+                   }
                  ]
                }
     end
 
     test "converts AllOf without children to true Literal" do
-      assert Spek.optimize(%AllOf{children: []}) == %Literal{satisfied?: true}
+      assert Spek.optimize(%AllOf{children: []}) == %Literal{
+               satisfied?: true,
+               result: true
+             }
     end
 
     test "converts AnyOf without children to false Literal" do
       assert Spek.optimize(%AnyOf{children: []}) == %Literal{
-               satisfied?: false
+               satisfied?: false,
+               result: false
              }
     end
 
     test "unwraps AllOf with a single child" do
-      check = %Check{fun: :role, args: []}
+      check = %Check{module: Checks, fun: :role, args: []}
       assert Spek.optimize(%AllOf{children: [check]}) == check
     end
 
     test "applies optimization on unwrapped AllOf child and on result" do
       assert Spek.optimize(%AllOf{children: [%AnyOf{children: []}]}) ==
-               %Literal{satisfied?: false}
+               %Literal{satisfied?: false, result: false}
     end
 
     test "unwraps anyOf with a single child" do
-      check = %Check{fun: :role, args: []}
+      check = %Check{module: Checks, fun: :role, args: []}
       assert Spek.optimize(%AnyOf{children: [check]}) == check
     end
 
     test "applies optimization on unwrapped AnyOf child and on result" do
       assert Spek.optimize(%AnyOf{children: [%AllOf{children: []}]}) ==
-               %Literal{satisfied?: true}
+               %Literal{satisfied?: true, result: true}
     end
 
     test "deduplicates AllOf" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Check{fun: :role},
-                 %Check{fun: :two_fa},
-                 %Check{fun: :role}
+                 %Check{module: Checks, fun: :role, args: []},
+                 %Check{module: Checks, fun: :two_fa, args: []},
+                 %Check{module: Checks, fun: :role, args: []}
                ]
              }) == %AllOf{
                children: [
-                 %Check{fun: :role},
-                 %Check{fun: :two_fa}
+                 %Check{module: Checks, fun: :role, args: []},
+                 %Check{module: Checks, fun: :two_fa, args: []}
                ]
              }
     end
@@ -867,13 +911,13 @@ defmodule SpekTest do
     test "does not deduplicate AllOf checks with different args" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Check{fun: :role, args: [:clown]}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Check{module: Checks, fun: :role, args: [:clown]}
                ]
              }) == %AllOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Check{fun: :role, args: [:clown]}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Check{module: Checks, fun: :role, args: [:clown]}
                ]
              }
     end
@@ -881,32 +925,32 @@ defmodule SpekTest do
     test "optimizes after deduplicating AllOf" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Literal{satisfied?: true},
-                 %Literal{satisfied?: true}
+                 %Literal{satisfied?: true, result: true},
+                 %Literal{satisfied?: true, result: true}
                ]
-             }) == %Literal{satisfied?: true}
+             }) == %Literal{satisfied?: true, result: true}
     end
 
     test "unwraps AllOf if one child remains after optimization" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Literal{satisfied?: true},
-                 %Check{fun: :two_factor}
+                 %Literal{satisfied?: true, result: true},
+                 %Check{module: Checks, fun: :two_factor, args: []}
                ]
-             }) == %Check{fun: :two_factor}
+             }) == %Check{module: Checks, fun: :two_factor, args: []}
     end
 
     test "deduplicates AnyOf" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Check{fun: :role},
-                 %Check{fun: :two_fa},
-                 %Check{fun: :role}
+                 %Check{module: Checks, fun: :role, args: []},
+                 %Check{module: Checks, fun: :two_fa, args: []},
+                 %Check{module: Checks, fun: :role, args: []}
                ]
              }) == %AnyOf{
                children: [
-                 %Check{fun: :role},
-                 %Check{fun: :two_fa}
+                 %Check{module: Checks, fun: :role, args: []},
+                 %Check{module: Checks, fun: :two_fa, args: []}
                ]
              }
     end
@@ -914,13 +958,13 @@ defmodule SpekTest do
     test "does not deduplicate AnyOf checks with different args" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Check{fun: :role, args: [:editor]}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Check{module: Checks, fun: :role, args: [:editor]}
                ]
              }) == %AnyOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Check{fun: :role, args: [:editor]}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Check{module: Checks, fun: :role, args: [:editor]}
                ]
              }
     end
@@ -928,57 +972,57 @@ defmodule SpekTest do
     test "optimizes after deduplicating AnyOf" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Literal{satisfied?: true},
-                 %Literal{satisfied?: true}
+                 %Literal{satisfied?: true, result: true},
+                 %Literal{satisfied?: true, result: true}
                ]
-             }) == %Literal{satisfied?: true}
+             }) == %Literal{satisfied?: true, result: true}
 
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Literal{satisfied?: false},
-                 %Literal{satisfied?: false}
+                 %Literal{satisfied?: false, result: false},
+                 %Literal{satisfied?: false, result: false}
                ]
-             }) == %Literal{satisfied?: false}
+             }) == %Literal{satisfied?: false, result: false}
     end
 
     test "unwraps AnyOf if one child remains after optimization" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Literal{satisfied?: false},
-                 %Check{fun: :two_factor}
+                 %Literal{satisfied?: false, result: false},
+                 %Check{module: Checks, fun: :two_factor, args: []}
                ]
-             }) == %Check{fun: :two_factor}
+             }) == %Check{module: Checks, fun: :two_factor, args: []}
     end
 
     test "converts AllOf with false literal to literal" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Literal{satisfied?: false}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Literal{satisfied?: false, result: false}
                ]
-             }) == %Literal{satisfied?: false}
+             }) == %Literal{satisfied?: false, result: false}
     end
 
     test "converts AnyOf with true literal to literal" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Literal{satisfied?: true}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Literal{satisfied?: true, result: true}
                ]
-             }) == %Literal{satisfied?: true}
+             }) == %Literal{satisfied?: true, result: true}
     end
 
     test "removes true literal from AllOf" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Check{fun: :two_fa},
-                 %Literal{satisfied?: true}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Check{module: Checks, fun: :two_fa, args: []},
+                 %Literal{satisfied?: true, result: true}
                ]
              }) == %AllOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Check{fun: :two_fa}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Check{module: Checks, fun: :two_fa, args: []}
                ]
              }
     end
@@ -986,14 +1030,14 @@ defmodule SpekTest do
     test "removes false literal from AnyOf" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Check{fun: :two_fa},
-                 %Literal{satisfied?: false}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Check{module: Checks, fun: :two_fa, args: []},
+                 %Literal{satisfied?: false, result: false}
                ]
              }) == %AnyOf{
                children: [
-                 %Check{fun: :role, args: [:admin]},
-                 %Check{fun: :two_fa}
+                 %Check{module: Checks, fun: :role, args: [:admin]},
+                 %Check{module: Checks, fun: :two_fa, args: []}
                ]
              }
     end
@@ -1003,32 +1047,32 @@ defmodule SpekTest do
                children: [
                  %AllOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
                    ]
                  },
                  %AllOf{
                    children: [
-                     %Check{fun: :check3},
-                     %Check{fun: :check1}
+                     %Check{module: Checks, fun: :check3, args: []},
+                     %Check{module: Checks, fun: :check1, args: []}
                    ]
                  },
-                 %Check{fun: :check4}
+                 %Check{module: Checks, fun: :check4, args: []}
                ]
              }) == %AnyOf{
                children: [
                  %AllOf{
                    children: [
-                     %Check{fun: :check1},
+                     %Check{module: Checks, fun: :check1, args: []},
                      %AnyOf{
                        children: [
-                         %Check{fun: :check2},
-                         %Check{fun: :check3}
+                         %Check{module: Checks, fun: :check2, args: []},
+                         %Check{module: Checks, fun: :check3, args: []}
                        ]
                      }
                    ]
                  },
-                 %Check{fun: :check4}
+                 %Check{module: Checks, fun: :check4, args: []}
                ]
              }
     end
@@ -1038,34 +1082,34 @@ defmodule SpekTest do
                children: [
                  %AllOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2},
-                     %Check{fun: :check3}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []},
+                     %Check{module: Checks, fun: :check3, args: []}
                    ]
                  },
                  %AllOf{
                    children: [
-                     %Check{fun: :check4},
-                     %Check{fun: :check1},
-                     %Check{fun: :check5}
+                     %Check{module: Checks, fun: :check4, args: []},
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check5, args: []}
                    ]
                  }
                ]
              }) == %AllOf{
                children: [
-                 %Check{fun: :check1},
+                 %Check{module: Checks, fun: :check1, args: []},
                  %AnyOf{
                    children: [
                      %AllOf{
                        children: [
-                         %Check{fun: :check2},
-                         %Check{fun: :check3}
+                         %Check{module: Checks, fun: :check2, args: []},
+                         %Check{module: Checks, fun: :check3, args: []}
                        ]
                      },
                      %AllOf{
                        children: [
-                         %Check{fun: :check4},
-                         %Check{fun: :check5}
+                         %Check{module: Checks, fun: :check4, args: []},
+                         %Check{module: Checks, fun: :check5, args: []}
                        ]
                      }
                    ]
@@ -1080,17 +1124,17 @@ defmodule SpekTest do
                children: [
                  %AllOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
                    ]
                  },
                  %AllOf{
                    children: [
-                     %Check{fun: :check1}
+                     %Check{module: Checks, fun: :check1, args: []}
                    ]
                  }
                ]
-             }) == %Check{fun: :check1}
+             }) == %Check{module: Checks, fun: :check1, args: []}
     end
 
     test "does not factorize AnyOf with single AllOf child" do
@@ -1098,21 +1142,21 @@ defmodule SpekTest do
                children: [
                  %AllOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
                    ]
                  },
-                 %Check{fun: :check3}
+                 %Check{module: Checks, fun: :check3, args: []}
                ]
              }) == %AnyOf{
                children: [
                  %AllOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
                    ]
                  },
-                 %Check{fun: :check3}
+                 %Check{module: Checks, fun: :check3, args: []}
                ]
              }
     end
@@ -1122,16 +1166,16 @@ defmodule SpekTest do
                children: [
                  %AllOf{
                    children: [
-                     %Check{fun: :check1}
+                     %Check{module: Checks, fun: :check1, args: []}
                    ]
                  },
                  %AllOf{
                    children: [
-                     %Check{fun: :check1}
+                     %Check{module: Checks, fun: :check1, args: []}
                    ]
                  }
                ]
-             }) == %Check{fun: :check1}
+             }) == %Check{module: Checks, fun: :check1, args: []}
     end
 
     test "factorizes AllOf and collapses single-child factorized branches" do
@@ -1139,32 +1183,32 @@ defmodule SpekTest do
                children: [
                  %AnyOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
                    ]
                  },
                  %AnyOf{
                    children: [
-                     %Check{fun: :check3},
-                     %Check{fun: :check1}
+                     %Check{module: Checks, fun: :check3, args: []},
+                     %Check{module: Checks, fun: :check1, args: []}
                    ]
                  },
-                 %Check{fun: :check4}
+                 %Check{module: Checks, fun: :check4, args: []}
                ]
              }) == %AllOf{
                children: [
                  %AnyOf{
                    children: [
-                     %Check{fun: :check1},
+                     %Check{module: Checks, fun: :check1, args: []},
                      %AllOf{
                        children: [
-                         %Check{fun: :check2},
-                         %Check{fun: :check3}
+                         %Check{module: Checks, fun: :check2, args: []},
+                         %Check{module: Checks, fun: :check3, args: []}
                        ]
                      }
                    ]
                  },
-                 %Check{fun: :check4}
+                 %Check{module: Checks, fun: :check4, args: []}
                ]
              }
     end
@@ -1174,34 +1218,34 @@ defmodule SpekTest do
                children: [
                  %AnyOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2},
-                     %Check{fun: :check3}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []},
+                     %Check{module: Checks, fun: :check3, args: []}
                    ]
                  },
                  %AnyOf{
                    children: [
-                     %Check{fun: :check4},
-                     %Check{fun: :check1},
-                     %Check{fun: :check5}
+                     %Check{module: Checks, fun: :check4, args: []},
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check5, args: []}
                    ]
                  }
                ]
              }) == %AnyOf{
                children: [
-                 %Check{fun: :check1},
+                 %Check{module: Checks, fun: :check1, args: []},
                  %AllOf{
                    children: [
                      %AnyOf{
                        children: [
-                         %Check{fun: :check2},
-                         %Check{fun: :check3}
+                         %Check{module: Checks, fun: :check2, args: []},
+                         %Check{module: Checks, fun: :check3, args: []}
                        ]
                      },
                      %AnyOf{
                        children: [
-                         %Check{fun: :check4},
-                         %Check{fun: :check5}
+                         %Check{module: Checks, fun: :check4, args: []},
+                         %Check{module: Checks, fun: :check5, args: []}
                        ]
                      }
                    ]
@@ -1216,17 +1260,17 @@ defmodule SpekTest do
                children: [
                  %AnyOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
                    ]
                  },
                  %AnyOf{
                    children: [
-                     %Check{fun: :check1}
+                     %Check{module: Checks, fun: :check1, args: []}
                    ]
                  }
                ]
-             }) == %Check{fun: :check1}
+             }) == %Check{module: Checks, fun: :check1, args: []}
     end
 
     test "does not factorize AllOf with single AnyOf child" do
@@ -1234,21 +1278,21 @@ defmodule SpekTest do
                children: [
                  %AnyOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
                    ]
                  },
-                 %Check{fun: :check3}
+                 %Check{module: Checks, fun: :check3, args: []}
                ]
              }) == %AllOf{
                children: [
                  %AnyOf{
                    children: [
-                     %Check{fun: :check1},
-                     %Check{fun: :check2}
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
                    ]
                  },
-                 %Check{fun: :check3}
+                 %Check{module: Checks, fun: :check3, args: []}
                ]
              }
     end
@@ -1258,71 +1302,98 @@ defmodule SpekTest do
                children: [
                  %AnyOf{
                    children: [
-                     %Check{fun: :check1}
+                     %Check{module: Checks, fun: :check1, args: []}
                    ]
                  },
                  %AnyOf{
                    children: [
-                     %Check{fun: :check1}
+                     %Check{module: Checks, fun: :check1, args: []}
                    ]
                  }
                ]
-             }) == %Check{fun: :check1}
+             }) == %Check{module: Checks, fun: :check1, args: []}
     end
 
     test "A and anyof(B) = A and B" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Check{fun: :check1},
-                 %AnyOf{children: [%Check{fun: :check2}]}
+                 %Check{module: Checks, fun: :check1, args: []},
+                 %AnyOf{
+                   children: [%Check{module: Checks, fun: :check2, args: []}]
+                 }
                ]
              }) == %AllOf{
-               children: [%Check{fun: :check1}, %Check{fun: :check2}]
+               children: [
+                 %Check{module: Checks, fun: :check1, args: []},
+                 %Check{module: Checks, fun: :check2, args: []}
+               ]
              }
     end
 
     test "allof(anyof(A)) = A" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %AnyOf{children: [%Check{fun: :check1}]}
+                 %AnyOf{
+                   children: [%Check{module: Checks, fun: :check1, args: []}]
+                 }
                ]
-             }) == %Check{fun: :check1}
+             }) == %Check{module: Checks, fun: :check1, args: []}
     end
 
     test "A or (A and B) = A" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Check{fun: :check1},
-                 %AllOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]}
+                 %Check{module: Checks, fun: :check1, args: []},
+                 %AllOf{
+                   children: [
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
+                   ]
+                 }
                ]
-             }) == %Check{fun: :check1}
+             }) == %Check{module: Checks, fun: :check1, args: []}
     end
 
     test "(A and B) or A = A" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %AllOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]},
-                 %Check{fun: :check1}
+                 %AllOf{
+                   children: [
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
+                   ]
+                 },
+                 %Check{module: Checks, fun: :check1, args: []}
                ]
-             }) == %Check{fun: :check1}
+             }) == %Check{module: Checks, fun: :check1, args: []}
     end
 
     test "(A or B) and A = A" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %AnyOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]},
-                 %Check{fun: :check1}
+                 %AnyOf{
+                   children: [
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
+                   ]
+                 },
+                 %Check{module: Checks, fun: :check1, args: []}
                ]
-             }) == %Check{fun: :check1}
+             }) == %Check{module: Checks, fun: :check1, args: []}
     end
 
     test "A and (A or B) = A" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Check{fun: :check1},
-                 %AnyOf{children: [%Check{fun: :check1}, %Check{fun: :check2}]}
+                 %Check{module: Checks, fun: :check1, args: []},
+                 %AnyOf{
+                   children: [
+                     %Check{module: Checks, fun: :check1, args: []},
+                     %Check{module: Checks, fun: :check2, args: []}
+                   ]
+                 }
                ]
-             }) == %Check{fun: :check1}
+             }) == %Check{module: Checks, fun: :check1, args: []}
     end
   end
 end

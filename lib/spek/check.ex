@@ -30,5 +30,7 @@ defmodule Spek.Check do
 
   @type args :: [{:ctx, atom} | :ctx | term]
 
+  @enforce_keys [:module, :fun, :args]
+
   defstruct [:module, :fun, :args, :result, :satisfied?]
 end

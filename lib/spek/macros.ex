@@ -36,7 +36,7 @@ defmodule Spek.Macros do
         # ...
       ])
   """
-  defmacro build_check(fun, args) do
+  defmacro build_check(fun, args \\ [:ctx]) do
     module = __CALLER__.module
     function_name = :"#{fun}_check"
 
