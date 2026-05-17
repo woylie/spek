@@ -24,15 +24,21 @@ defmodule Spek.EvaluationError do
     exception.message || @default_message
   end
 
+  @doc """
+  Returns a new `EvaluationError` struct.
+  """
   @spec new(String.t()) :: __MODULE__.t()
   def new(message \\ @default_message) do
     %__MODULE__{message: message}
   end
 
-  @doc false
-  def with_expression(expression) do
+  @doc """
+  Returns a new `EvaluationError` struct that contains the given expression.
+  """
+  @spec with_expression(String.t(), Spek.expression()) :: __MODULE__.t()
+  def with_expression(message \\ @default_message, expression) do
     %__MODULE__{
-      message: @default_message,
+      message: message,
       expression: expression
     }
   end
