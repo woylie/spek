@@ -14,7 +14,7 @@ defmodule Spek.Check do
   - `satisfied?` - A boolean set depending on the return value of the check
     function.
 
-  `result` and `satisfied?` are only set when the policy is evaluated.
+  `result` and `satisfied?` are only set when the expression is evaluated.
 
   The `result` values `true`, `:ok`, and `{:ok, term}` are mapped to
   `satisfied?: true`. The result values `false`, `:error`, and `{:error, term}`
@@ -28,6 +28,17 @@ defmodule Spek.Check do
           satisfied?: boolean | nil
         }
 
+  @typedoc """
+  Defines the arguments passed to the check function.
+
+  If the list is empty, the function will be called without arguments.
+
+  The list value `:ctx` is substituted with the evaluation context passed to
+  the evaluation functions.
+
+  The list value `{:ctx, atom}` is substituted with the value at the given key
+  in the evaluation context.
+  """
   @type args :: [{:ctx, atom} | :ctx | term]
 
   @enforce_keys [:module, :fun, :args]

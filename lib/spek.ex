@@ -1,6 +1,12 @@
 defmodule Spek do
   @moduledoc """
-  Documentation for `Spek`.
+  Spek is a boolean expression engine for Elixir.
+
+  It allows you to model, optimize, and evaluate rules using composable
+  expressions.
+
+  This module contains all expression builder, evaluation, and optimization
+  functions. Please refer to the readme for details.
   """
 
   alias Spek.AllOf
@@ -10,12 +16,29 @@ defmodule Spek do
   alias Spek.Literal
   alias Spek.Not
 
+  @typedoc """
+  A boolean expression tree.
+  """
   @type expression :: AllOf.t() | AnyOf.t() | Check.t() | Literal.t() | Not.t()
 
+  @typedoc """
+  The evaluation context as passed to the evaluation functions.
+  """
   @type context :: term
 
+  @typedoc """
+  An expression result value that results in a successful evaluation.
+  """
   @type truthy :: true | :ok | {:ok, term}
+
+  @typedoc """
+  An expression result value that results in a failed evaluation.
+  """
   @type falsy :: false | :error | {:error, term}
+
+  @typedoc """
+  The result of an expression evaluation.
+  """
   @type result :: truthy | falsy
 
   ## Builders
@@ -78,7 +101,7 @@ defmodule Spek do
   end
 
   @doc """
-  Builds an expression that requires at least one child to be true.
+  Builds an expression that requires at least one of two children to be true.
 
   ## Example
 
@@ -470,7 +493,7 @@ defmodule Spek do
 
   @doc """
   Evaluates the given expression and returns the expression annotated with
-  evaluation results.
+  evaluation results or raises an error.
 
   Stops early as soon as the final outcome is determined. The returned
   expression only contains the evaluated parts.
@@ -511,8 +534,8 @@ defmodule Spek do
   end
 
   @doc """
-  Evaluates the given expression and returns the expression annotated with the
-  expression result.
+  Evaluates the full given expression and returns the expression annotated with
+  the expression results.
 
   Always evaluates the entire expression, even if the final outcome could be
   determined earlier.
@@ -596,8 +619,8 @@ defmodule Spek do
   end
 
   @doc """
-  Evaluates the given expression and returns the expression annotated with
-  evaluation results.
+  Evaluates the full given expression and returns the expression annotated with
+  evaluation results or raises an error.
 
   Raises if the expression is not satisfied. Unlike `eval!/2`, the raised
   exception contains the evaluated expression.
@@ -790,7 +813,7 @@ defmodule Spek do
   ## Optimization
 
   @doc """
-  Performs optimizations on the given expression.
+  Performs boolean algebra transformations on the given expression.
 
   ## Examples
 

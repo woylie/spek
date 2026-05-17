@@ -20,13 +20,13 @@ defmodule Spek.Macros do
         def active_user(%{state: :active}), do: :ok
         def active_user(%{state: :inactive}), do: {:error, :user_inactive}
 
-        build_check(:active_user, [:ctx])
+        build_check(:active_user)
       end
 
   This will compile a `{fun}_check/0` function like this:
 
-      def active_user_check do
-        %Check{module: MyApp.MyModule, fun: :active_user, args: [:ctx]}
+      def active_user_check(args \\\\ [:ctx]) do
+        %Check{module: MyApp.MyModule, fun: :active_user, args: args}
       end
 
   You can then use this function when building complex rules:
@@ -35,6 +35,16 @@ defmodule Spek.Macros do
         MyApp.MyModule.active_user_check(),
         # ...
       ])
+
+  The second argument sets the default `args`. This:
+
+      build_check(:active_user, [{:ctx, :user}])
+
+  Compiles to:
+    
+      def active_user_check(args \\\\ [{:ctx, :user}]) do
+        %Check{module: MyApp.MyModule, fun: :active_user, args: args}
+      end
   """
   defmacro build_check(fun, args \\ [:ctx]) do
     module = __CALLER__.module
@@ -57,8 +67,8 @@ defmodule Spek.Macros do
 
   ## Generated functions
 
-  The arity of the generated function depends on the number of arguments set
-  with the second macro argument.
+  The arity of the generated function depends on the number of arguments passed
+  to the macro.
 
   - `{name}?` - A predicate function that returns the result of the boolean
     expression defined in the do-block.
@@ -66,15 +76,11 @@ defmodule Spek.Macros do
     do-block and returns `:ok` or `{:error, term}`.
   - `{name}_check` - A function that returns a `Spek.Check` struct.
 
-  ## Arguments
+  ## Options
 
-  - `name` - The base name for three functions.
-  - `args` - The argument or list of arguments passed to each function. These
-    argument names can be used in the do-block.
-  - `opts` - Additional options:
-    - `:args` - The list of arguments as used in the `Spek.Check` struct.
-      Defaults to `[:ctx]`.
-    - `:reason` - The reason used in the error tuple. Defaults to `:failed`.
+  - `:args` - The list of arguments as used in the `Spek.Check` struct.
+    Defaults to `[:ctx]`.
+  - `:reason` - The reason used in the error tuple. Defaults to `:failed`.
 
   ## Do-block
 
@@ -113,7 +119,7 @@ defmodule Spek.Macros do
       end
 
   The `account_balanced?/1` and `account_balanced/1` functions can be used
-  directly, and the `account_balanced_check/0` function can be used directly
+  directly, and the `account_balanced_check/0` function can be used
   with the Spek evaluation functions, or be combined with additional checks to
   define complex rules.
 
