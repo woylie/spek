@@ -8,6 +8,7 @@ defmodule Spek.MacrosTest do
     import Spek.Macros
 
     build_check(:user_active, [{:ctx, :state}, :active])
+    build_check(:user_banned)
 
     defcheck account_balanced(account,
                args: [:ctx],
@@ -37,6 +38,14 @@ defmodule Spek.MacrosTest do
       assert Checks.user_active_check() == %Check{
                args: [{:ctx, :state}, :active],
                fun: :user_active,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "defaults args to [:ctx]" do
+      assert Checks.user_banned_check() == %Check{
+               args: [:ctx],
+               fun: :user_banned,
                module: Spek.MacrosTest.Checks
              }
     end
