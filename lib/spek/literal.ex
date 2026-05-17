@@ -5,5 +5,7 @@ defmodule Spek.Literal do
 
   @type t :: %__MODULE__{satisfied?: boolean, result: Spek.result()}
 
+  @enforce_keys [:satisfied?, :result]
+
   defstruct [:satisfied?, :result]
 end

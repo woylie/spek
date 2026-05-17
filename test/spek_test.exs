@@ -13,8 +13,8 @@ defmodule SpekTest do
 
   describe "eval?/2" do
     test "evaluates literal" do
-      assert Spek.eval?(%Literal{satisfied?: true}) == true
-      assert Spek.eval?(%Literal{satisfied?: false}) == false
+      assert Spek.eval?(%Literal{satisfied?: true, result: true}) == true
+      assert Spek.eval?(%Literal{satisfied?: false, result: false}) == false
     end
 
     test "evaluates check without arg" do
@@ -145,8 +145,8 @@ defmodule SpekTest do
       for {v1, v2, expected} <- test_cases do
         assert Spek.eval?(%AllOf{
                  children: [
-                   %Literal{satisfied?: v1},
-                   %Literal{satisfied?: v2}
+                   %Literal{satisfied?: v1, result: v1},
+                   %Literal{satisfied?: v2, result: v2}
                  ]
                }) == expected
       end
@@ -158,11 +158,11 @@ defmodule SpekTest do
 
     test "evaluates AnyOf with one child" do
       assert Spek.eval?(%AnyOf{
-               children: [%Literal{satisfied?: true}]
+               children: [%Literal{satisfied?: true, result: true}]
              }) == true
 
       assert Spek.eval?(%AnyOf{
-               children: [%Literal{satisfied?: false}]
+               children: [%Literal{satisfied?: false, result: false}]
              }) == false
     end
 
@@ -178,8 +178,8 @@ defmodule SpekTest do
       for {v1, v2, expected} <- test_cases do
         assert Spek.eval?(%AnyOf{
                  children: [
-                   %Literal{satisfied?: v1},
-                   %Literal{satisfied?: v2}
+                   %Literal{satisfied?: v1, result: v1},
+                   %Literal{satisfied?: v2, result: v2}
                  ]
                }) == expected
       end
@@ -188,14 +188,14 @@ defmodule SpekTest do
 
   describe "eval_tree/2" do
     test "evaluates literal" do
-      assert Spek.eval_tree(%Literal{satisfied?: true}) ==
-               {:ok, %Literal{satisfied?: true}}
+      assert Spek.eval_tree(%Literal{satisfied?: true, result: true}) ==
+               {:ok, %Literal{satisfied?: true, result: true}}
 
       assert {:error, %EvaluationError{expression: expression}} =
-               Spek.eval_tree(%Literal{satisfied?: false})
+               Spek.eval_tree(%Literal{satisfied?: false, result: false})
 
       assert expression ==
-               %Literal{satisfied?: false}
+               %Literal{satisfied?: false, result: false}
     end
 
     test "evaluates check without arg" do
@@ -377,20 +377,20 @@ defmodule SpekTest do
     test "evaluates not with literal" do
       assert {:error, %EvaluationError{expression: expression}} =
                Spek.eval_tree(%Not{
-                 expression: %Literal{satisfied?: true}
+                 expression: %Literal{satisfied?: true, result: true}
                })
 
       assert expression == %Not{
-               expression: %Literal{satisfied?: true},
+               expression: %Literal{satisfied?: true, result: true},
                satisfied?: false
              }
 
       assert Spek.eval_tree(%Not{
-               expression: %Literal{satisfied?: false}
+               expression: %Literal{satisfied?: false, result: false}
              }) ==
                {:ok,
                 %Not{
-                  expression: %Literal{satisfied?: false},
+                  expression: %Literal{satisfied?: false, result: false},
                   satisfied?: true
                 }}
     end
@@ -768,7 +768,7 @@ defmodule SpekTest do
 
   describe "optimize/1" do
     test "returns Literal unchanged" do
-      literal = %Literal{satisfied?: true}
+      literal = %Literal{satisfied?: true, result: true}
       assert Spek.optimize(literal) == literal
     end
 
@@ -784,11 +784,15 @@ defmodule SpekTest do
     end
 
     test "resolves not on literals" do
-      assert Spek.optimize(%Not{expression: %Literal{satisfied?: true}}) ==
-               %Literal{satisfied?: false}
+      assert Spek.optimize(%Not{
+               expression: %Literal{satisfied?: true, result: true}
+             }) ==
+               %Literal{satisfied?: false, result: false}
 
-      assert Spek.optimize(%Not{expression: %Literal{satisfied?: false}}) ==
-               %Literal{satisfied?: true}
+      assert Spek.optimize(%Not{
+               expression: %Literal{satisfied?: false, result: false}
+             }) ==
+               %Literal{satisfied?: true, result: true}
     end
 
     test "pushes down Not in AllOf" do
@@ -820,12 +824,16 @@ defmodule SpekTest do
     end
 
     test "converts AllOf without children to true Literal" do
-      assert Spek.optimize(%AllOf{children: []}) == %Literal{satisfied?: true}
+      assert Spek.optimize(%AllOf{children: []}) == %Literal{
+               satisfied?: true,
+               result: true
+             }
     end
 
     test "converts AnyOf without children to false Literal" do
       assert Spek.optimize(%AnyOf{children: []}) == %Literal{
-               satisfied?: false
+               satisfied?: false,
+               result: false
              }
     end
 
@@ -836,7 +844,7 @@ defmodule SpekTest do
 
     test "applies optimization on unwrapped AllOf child and on result" do
       assert Spek.optimize(%AllOf{children: [%AnyOf{children: []}]}) ==
-               %Literal{satisfied?: false}
+               %Literal{satisfied?: false, result: false}
     end
 
     test "unwraps anyOf with a single child" do
@@ -846,7 +854,7 @@ defmodule SpekTest do
 
     test "applies optimization on unwrapped AnyOf child and on result" do
       assert Spek.optimize(%AnyOf{children: [%AllOf{children: []}]}) ==
-               %Literal{satisfied?: true}
+               %Literal{satisfied?: true, result: true}
     end
 
     test "deduplicates AllOf" do
@@ -881,16 +889,16 @@ defmodule SpekTest do
     test "optimizes after deduplicating AllOf" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Literal{satisfied?: true},
-                 %Literal{satisfied?: true}
+                 %Literal{satisfied?: true, result: true},
+                 %Literal{satisfied?: true, result: true}
                ]
-             }) == %Literal{satisfied?: true}
+             }) == %Literal{satisfied?: true, result: true}
     end
 
     test "unwraps AllOf if one child remains after optimization" do
       assert Spek.optimize(%AllOf{
                children: [
-                 %Literal{satisfied?: true},
+                 %Literal{satisfied?: true, result: true},
                  %Check{fun: :two_factor}
                ]
              }) == %Check{fun: :two_factor}
@@ -928,23 +936,23 @@ defmodule SpekTest do
     test "optimizes after deduplicating AnyOf" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Literal{satisfied?: true},
-                 %Literal{satisfied?: true}
+                 %Literal{satisfied?: true, result: true},
+                 %Literal{satisfied?: true, result: true}
                ]
-             }) == %Literal{satisfied?: true}
+             }) == %Literal{satisfied?: true, result: true}
 
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Literal{satisfied?: false},
-                 %Literal{satisfied?: false}
+                 %Literal{satisfied?: false, result: false},
+                 %Literal{satisfied?: false, result: false}
                ]
-             }) == %Literal{satisfied?: false}
+             }) == %Literal{satisfied?: false, result: false}
     end
 
     test "unwraps AnyOf if one child remains after optimization" do
       assert Spek.optimize(%AnyOf{
                children: [
-                 %Literal{satisfied?: false},
+                 %Literal{satisfied?: false, result: false},
                  %Check{fun: :two_factor}
                ]
              }) == %Check{fun: :two_factor}
@@ -954,18 +962,18 @@ defmodule SpekTest do
       assert Spek.optimize(%AllOf{
                children: [
                  %Check{fun: :role, args: [:admin]},
-                 %Literal{satisfied?: false}
+                 %Literal{satisfied?: false, result: false}
                ]
-             }) == %Literal{satisfied?: false}
+             }) == %Literal{satisfied?: false, result: false}
     end
 
     test "converts AnyOf with true literal to literal" do
       assert Spek.optimize(%AnyOf{
                children: [
                  %Check{fun: :role, args: [:admin]},
-                 %Literal{satisfied?: true}
+                 %Literal{satisfied?: true, result: true}
                ]
-             }) == %Literal{satisfied?: true}
+             }) == %Literal{satisfied?: true, result: true}
     end
 
     test "removes true literal from AllOf" do
@@ -973,7 +981,7 @@ defmodule SpekTest do
                children: [
                  %Check{fun: :role, args: [:admin]},
                  %Check{fun: :two_fa},
-                 %Literal{satisfied?: true}
+                 %Literal{satisfied?: true, result: true}
                ]
              }) == %AllOf{
                children: [
@@ -988,7 +996,7 @@ defmodule SpekTest do
                children: [
                  %Check{fun: :role, args: [:admin]},
                  %Check{fun: :two_fa},
-                 %Literal{satisfied?: false}
+                 %Literal{satisfied?: false, result: false}
                ]
              }) == %AnyOf{
                children: [
