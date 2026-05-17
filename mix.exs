@@ -60,7 +60,7 @@ defmodule Spek.MixProject do
   end
 
   defp description do
-    "Business rule evaluator and optimizer"
+    "Boolean expression engine"
   end
 
   defp package do
