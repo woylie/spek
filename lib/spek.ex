@@ -106,7 +106,7 @@ defmodule Spek do
   """
   @doc type: :builder
   @spec check(module, fun, Check.args()) :: Check.t()
-  def check(module, fun, args) do
+  def check(module, fun, args \\ [:ctx]) do
     %Check{module: module, fun: fun, args: args}
   end
 
