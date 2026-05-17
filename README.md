@@ -7,7 +7,7 @@ Spek is a boolean expression engine for Elixir.
 It allows you to model, optimize, and evaluate rules using composable
 expressions.
 
-Features:
+## Features
 
 - Expression structs and builder functions for boolean logic: `AllOf`, `AnyOf`,
   `Not`, `Literal`, `Check`.
@@ -713,6 +713,46 @@ defmodule MyApp.Rules do
   def admin_override, do: @admin_override
   def export_customer_data, do: @export_customer_data
 end
+```
+
+Compile-time optimization can also be useful if a rule depends on a
+compile-time flag. In the following example, a Literal is created using a
+value known at compile time:
+
+```elixir
+defmodule MyApp.Rules do
+  import Spek
+
+  alias MyApp.Checks
+
+  @feature_enabled? Application.compile_env(:spek, :feature_enabled?, true)
+
+  @enterprise_export all_of([
+                       check(Checks, :account_active?),
+                       check(Checks, :user_has_export_permission?),
+                       literal(@feature_enabled?)
+                     ])
+  @enterprise_export optimize(@enterprise_export)
+
+  def enterprise_export, do: @enterprise_export
+end
+```
+
+If the feature is enabled, the literal is removed from the expression:
+
+```elixir
+%Spek.AllOf{
+  children: [
+    %Spek.Check{module: MyApp.Checks, fun: :account_active?, args: [:ctx]},
+    %Spek.Check{module: MyApp.Checks, fun: :user_has_export_permission?, args: [:ctx]}
+  ]
+}
+```
+
+If the feature is disabled, the expression is reduced to a single literal:
+
+```elixir
+%Spek.Literal{satisfied?: false, result: false}
 ```
 
 For more information about the optimizations that are applied, refer to the
