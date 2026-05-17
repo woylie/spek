@@ -24,6 +24,10 @@ defmodule Spek.MacrosTest do
       user.organization_id == organization.id
     end
 
+    defcheck charging(device) do
+      device.charging?
+    end
+
     defcheck always_true() do
       true
     end
@@ -122,6 +126,14 @@ defmodule Spek.MacrosTest do
 
       assert Checks.always_false?() == false
       assert Checks.always_false() == {:error, :failed}
+    end
+
+    test "can be called without arguments" do
+      assert Checks.charging_check() == %Check{
+               args: [:ctx],
+               fun: :charging,
+               module: Spek.MacrosTest.Checks
+             }
     end
   end
 end
