@@ -25,6 +25,14 @@ expressions.
   - Constant folding
 - Macros for concisely defining reusable check functions.
 
+## Use cases
+
+- Complex domain rules with composable conditions
+- Specification pattern implementations
+- Workflow, pipeline, and feature gating conditions
+- User-configurable decision systems
+- Auditable decision logs with per-check results and success/failure reasons
+
 ## Installation
 
 Add `spek` to your list of dependencies in `mix.exs`:
@@ -32,12 +40,10 @@ Add `spek` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:spek, "~> 0.1.1"}
+    {:spek, "~> 0.1.2"}
   ]
 end
 ```
-
-## Usage
 
 ## Expressions
 
@@ -49,27 +55,27 @@ functions can take any kind of input and must return either a boolean, `:ok`,
 
 The example below defines two variants of the same check: The first one returns
 a boolean, and the second one returns either `:ok` or an error tuple. We assume
-that the value of the `subscribed` field is a boolean.
+that the value of the `footage_ingested` field is a boolean.
 
 ```elixir
-defmodule MyApp.UserChecks do
-  def user_subscribed?(%User{subscribed: subscribed}) do
-    subscribed
+defmodule ProductionChecks do
+  def footage_ingested?(%Production{footage_ingested: ingested}) do
+    ingested
   end
 
-  def user_subscribed(%User{subscribed: true}), do: :ok
-  def user_subscribed(%User{subscribed: false}), do: {:error, :not_subscribed}
+  def footage_ingested(%Production{footage_ingested: true}), do: :ok
+  def footage_ingested(%Production{footage_ingested: false}), do: {:error, :ingestion_missing}
 end
 ```
 
 These check functions can be referenced in a `Spek.Check` struct:
 
 ```elixir
-%Spek.Check{module: MyApp.UserChecks, fun: :user_subscribed, args: [:ctx]}
+%Spek.Check{module: ProductionChecks, fun: :footage_ingested, args: [:ctx]}
 ```
 
 Here, `args: [:ctx]` means that the context argument passed to the evaluation
-functions is passed directly to the referenced `user_subscribed/1` function.
+functions is passed directly to the referenced `footage_ingested/1` function.
 More on that later.
 
 A `Spek.Check` struct is a complete expression, but it can be combined with
@@ -105,14 +111,14 @@ the caller.
 
 ### Not
 
-If we wanted to check that a user is not subscribed, we could write it like
+If we wanted to check that the footage is not ingested, we could write it like
 this:
 
 ```elixir
 %Spek.Not{
   expression: %Spek.Check{
-    module: MyApp.UserChecks,
-    fun: :user_subscribed,
+    module: ProductionChecks,
+    fun: :footage_ingested,
     args: [:ctx]
   }
 }
@@ -126,13 +132,13 @@ Use `Spek.AllOf` to combine checks that _all_ must evaluate to `true`.
 %AllOf{
   children: [
     %Spek.Check{
-      module: MyApp.UserChecks,
-      fun: :user_active,
+      module: ProductionChecks,
+      fun: :edit_session_active,
       args: [:ctx]
     },
     %Spek.Check{
-      module: MyApp.UserChecks,
-      fun: :user_subscribed,
+      module: ProductionChecks,
+      fun: :footage_ingested,
       args: [:ctx]
     }
   ]
@@ -147,23 +153,23 @@ Use `Spek.AnyOf` if one of the checks must evaluate to `true`.
 %AnyOf{
   children: [
     %Spek.Check{
-      module: MyApp.NotificationChecks,
-      fun: :security_notification,
-      args: [{:ctx, :notification}]
+      module: PipelineChecks,
+      fun: :render_cache_warmed,
+      args: [{:ctx, :pipeline_event}]
     },
     %Spek.Check{
-      module: MyApp.UserChecks,
-      fun: :user_subscribed,
-      args: [{:ctx, :user}]
+      module: ProductionChecks,
+      fun: :footage_ingested,
+      args: [{:ctx, :production}]
     }
   ]
 }
 ```
 
-Note that we changed `[:ctx]` to `[{:ctx, :notification}]` and
-`[{:ctx, :user}]`. This means instead of passing the whole evaluation context
-to the check function, we can use a map or keyword list as context and pass
-the value under the respective key to the check function.
+Note that we changed `[:ctx]` to `[{:ctx, :pipeline_event}]` and
+`[{:ctx, :production}]`. This means instead of passing the whole evaluation
+context to the check function, we can use a map or keyword list as context and
+pass the value under the respective key to the check function.
 
 The expression structs can be arbitrarily combined and nested.
 
@@ -171,28 +177,28 @@ The expression structs can be arbitrarily combined and nested.
 %AllOf{
   children: [
     %Spek.Check{
-      module: MyApp.UserChecks,
-      fun: :user_active,
-      args: [{:ctx, :user}]
+      module: ProductionChecks,
+      fun: :edit_session_active,
+      args: [{:ctx, :production}]
     },
     %Spek.Not{
       expression: %Spek.Check{
-        module: MyApp.UserChecks,
-        fun: :user_banned,
-        args: [{:ctx, :user}]
+        module: ProductionChecks,
+        fun: :source_material_corrupt,
+        args: [{:ctx, :production}]
       }
     },
     %AnyOf{
       children: [
         %Spek.Check{
-          module: MyApp.NotificationChecks,
-          fun: :security_notification,
-          args: [{:ctx, :notification}]
+          module: PipelineChecks,
+          fun: :render_cache_warmed,
+          args: [{:ctx, :pipeline_event}]
         },
         %Spek.Check{
-          module: MyApp.UserChecks,
-          fun: :user_subscribed,
-          args: [{:ctx, :user}]
+          module: ProductionChecks,
+          fun: :footage_ingested,
+          args: [{:ctx, :production}]
         }
       ]
     }
@@ -203,20 +209,20 @@ The expression structs can be arbitrarily combined and nested.
 ## Builder functions
 
 Writing out the structs like above is a bit tedious. Spek has builder functions
-for all the structs. Let's rewrite the previous example, and let's also put it
+for all structs. Let's rewrite the previous example, and let's also put it
 in a module while we're at it.
 
 ```elixir
-defmodule MyApp.Rules do
-  def send_notification_rule do
+defmodule Rules do
+  def final_cut_release_rule do
     Spek.all_of([
-      Spek.check(MyApp.UserChecks, :user_active, [{:ctx, :user}]),
+      Spek.check(ProductionChecks, :edit_session_active, [{:ctx, :production}]),
       Spek.negate(
-        Spek.check(MyApp.UserChecks, :user_banned, [{:ctx, :user}])
+        Spek.check(ProductionChecks, :source_material_corrupt, [{:ctx, :production}])
       ),
       Spek.any_of([
-        Spek.check(MyApp.NotificationChecks, :security_notification, [{:ctx, :notification}]),
-        Spek.check(MyApp.UserChecks, :user_subscribed, [{:ctx, :user}])
+        Spek.check(PipelineChecks, :render_cache_warmed, [{:ctx, :pipeline_event}]),
+        Spek.check(ProductionChecks, :footage_ingested, [{:ctx, :production}])
       ])
     ])
   end
@@ -224,67 +230,61 @@ end
 ```
 
 That's better, but still a bit verbose. We can improve this by defining helper
-functions for each check. Let's turn back to our user checks module. We don't
-use the `{name}?` functions currently, but we probably need them elsewhere in
-the application, so let's include them and keep everything together.
-
-This is probably not how you would model active/banned/subscribed states in a
-real application, but let's stick with it for the example.
+functions for each check. Let's turn back to our production checks module. We
+don't use the `{name}?` functions currently, but we probably need them elsewhere
+in the application, so let's include them and keep everything together.
 
 ```elixir
-defmodule MyApp.UserChecks do
-  def user_active?(%User{state: :active}), do: true
-  def user_active?(%User{}), do: false
+defmodule ProductionChecks do
+  def edit_session_active?(%Production{state: :active}), do: true
+  def edit_session_active?(%Production{}), do: false
 
-  def user_active(%User{state: :active}), do: :ok
-  def user_active(%User{}), do: {:error, :user_inactive}
+  def edit_session_active(%Production{state: :active}), do: :ok
+  def edit_session_active(%Production{}), do: {:error, :edit_session_stalled}
 
-  def user_active_check(args \\ [:ctx]) do
-    Spek.check(__MODULE__, :user_active, args)
+  def edit_session_active_check(args \\ [:ctx]) do
+    Spek.check(__MODULE__, :edit_session_active, args)
   end
 
-  def user_banned?(%User{banned: banned}), do: banned
+  def source_material_corrupt?(%Production{source_material_corrupt: source_material_corrupt}), do: source_material_corrupt
 
-  def user_banned(%User{banned: true}), do: :ok
-  def user_banned(%User{banned: false}), do: {:error, :user_banned}
+  def source_material_corrupt(%Production{source_material_corrupt: true}), do: :ok
+  def source_material_corrupt(%Production{source_material_corrupt: false}), do: {:error, :source_material_corrupt}
 
-  def user_banned_check(args \\ [:ctx]) do
-    Spek.check(__MODULE__, :user_active, args)
+  def source_material_corrupt_check(args \\ [:ctx]) do
+    Spek.check(__MODULE__, :source_material_corrupt, args)
   end
 
-  def user_subscribed?(%User{subscribed: subscribed}) do
-    subscribed
+  def footage_ingested?(%Production{footage_ingested: footage_ingested}) do
+    footage_ingested
   end
 
-  def user_subscribed(%User{subscribed: true}), do: :ok
-  def user_subscribed(%User{subscribed: false}), do: {:error, :not_subscribed}
+  def footage_ingested(%Production{footage_ingested: true}), do: :ok
+  def footage_ingested(%Production{footage_ingested: false}), do: {:error, :ingestion_missing}
 
-  def user_subscribed_check(args \\ [:ctx]) do
-    Spek.check(__MODULE__, :user_subscribed, args)
+  def footage_ingested_check(args \\ [:ctx]) do
+    Spek.check(__MODULE__, :footage_ingested, args)
   end
 end
 ```
 
-Note that we default the check's `args` to `[:ctx]`, but allow the user to
+Note that we default the check's `args` to `[:ctx]`, but allow the production to
 override them.
 
-Assuming that we set up our `NotificationChecks` module in the same way, we can
+Assuming that we set up our `PipelineChecks` module in the same way, we can
 now change our rule definition to:
 
 ```elixir
-defmodule MyApp.Rules do
-  alias MyApp
-  alias MyApp.UserChecks
-
-  def send_notification_rule do
+defmodule Rules do
+  def final_cut_release_rule do
     Spek.all_of([
-      UserChecks.user_active_check([{:ctx, :user}]),
+      ProductionChecks.edit_session_active_check([{:ctx, :production}]),
       Spek.negate(
-        UserChecks.user_banned_check([{:ctx, :user}])
+        ProductionChecks.source_material_corrupt_check([{:ctx, :production}])
       ),
       Spek.any_of([
-        NotificationChecks.security_notification([{:ctx, :notification}]),
-        UserChecks.user_subscribed([{:ctx, :user}])
+        PipelineChecks.render_cache_warmed([{:ctx, :pipeline_event}]),
+        ProductionChecks.footage_ingested([{:ctx, :production}])
       ])
     ])
   end
@@ -296,16 +296,16 @@ the default `args`.
 
 ```elixir
 Spek.all_of([
-  UserChecks.user_active_check(),
+  ProductionChecks.edit_session_active_check(),
   Spek.negate(
-    UserChecks.user_banned_check()
+    ProductionChecks.source_material_corrupt_check()
   )
 ])
 ```
 
 ## Check macros
 
-If we want to make our `UserChecks` module less verbose, we can optionally use
+If we want to make our `ProductionChecks` module less verbose, we can optionally use
 one of two macros.
 
 The `Spek.Macros.build_check/2` macro defines a function that returns a check
@@ -314,12 +314,12 @@ that references a function in the current module.
 Instead of:
 
 ```elixir
-defmodule MyApp.UserChecks do
-  def user_active(%User{state: :active}), do: :ok
-  def user_active(%User{}), do: {:error, :user_inactive}
+defmodule ProductionChecks do
+  def edit_session_active(%Production{state: :active}), do: :ok
+  def edit_session_active(%Production{}), do: {:error, :edit_session_stalled}
 
-  def user_active_check(args \\ [:ctx]) do
-    Spek.check(__MODULE__, :user_active, args)
+  def edit_session_active_check(args \\ [:ctx]) do
+    Spek.check(__MODULE__, :edit_session_active, args)
   end
 end
 ```
@@ -327,34 +327,34 @@ end
 You can write:
 
 ```elixir
-defmodule MyApp.UserChecks do
+defmodule ProductionChecks do
   import Spek.Macros
 
-  def user_active(%User{state: :active}), do: :ok
-  def user_active(%User{}), do: {:error, :user_inactive}
+  def edit_session_active(%Production{state: :active}), do: :ok
+  def edit_session_active(%Production{}), do: {:error, :edit_session_stalled}
 
-  build_check(:user_active)
+  build_check(:edit_session_active)
 
   # or if you need different default args:
-  # build_check(:user_active, [{:ctx, :user}])
+  # build_check(:edit_session_active, [{:ctx, :production}])
 end
 ```
 
 If you want to go one step further, you can use `Spek.Macros.defcheck/2` to
 define a check once and compile it for different use cases. We defined three
-functions for the same predicate above: `user_active?/1`, `user_active/1`, and
-`user_active_check/1`.
+functions for the same predicate above: `edit_session_active?/1`, `edit_session_active/1`, and
+`edit_session_active_check/1`.
 
 ```elixir
-defmodule MyApp.UserChecks do
-  def user_active?(%User{state: :active}), do: true
-  def user_active?(%User{}), do: false
+defmodule ProductionChecks do
+  def edit_session_active?(%Production{state: :active}), do: true
+  def edit_session_active?(%Production{}), do: false
 
-  def user_active(%User{state: :active}), do: :ok
-  def user_active(%User{}), do: {:error, :user_inactive}
+  def edit_session_active(%Production{state: :active}), do: :ok
+  def edit_session_active(%Production{}), do: {:error, :edit_session_stalled}
 
-  def user_active_check(args \\ [:ctx]) do
-    Spek.check(__MODULE__, :user_active, args)
+  def edit_session_active_check(args \\ [:ctx]) do
+    Spek.check(__MODULE__, :edit_session_active, args)
   end
 end
 ```
@@ -362,10 +362,11 @@ end
 You can replace all of that with:
 
 ```elixir
-defmodule MyApp.UserChecks do
+defmodule ProductionChecks do
   import Spek.Macros
 
-  defcheck user_active(%User{state: state}, reason: :user_inactive) do
+  defcheck edit_session_active(%Production{state: state},
+             reason: :edit_session_stalled) do
     state == :active
   end
 end
@@ -375,18 +376,18 @@ The only requirement for the do-block is that it evaluates to a boolean.
 
 So far, all our check functions use a single argument, but there is no
 limitation to the number of arguments. For example, if you wanted to define a
-check that ensures that a user belongs to a certain organization, you could do
-it like this:
+check that ensures that a production belongs to a certain shot list, you could
+do it like this:
 
 ```elixir
-defmodule MyApp.UserChecks do
+defmodule ProductionChecks do
   import Spek.Macros
 
-  defcheck member_of_organization(user, organization,
-             args: [{:ctx, :user], {:ctx, :organization}],
-             reason: :not_member_of_organization
+  defcheck shot_list_included(production, shot_list,
+             args: [{:ctx, :production}, {:ctx, :shot_list}],
+             reason: :missing_shot_list
            ) do
-    user.organization_id == organization.id
+    production.shot_list_id == shot_list.id
   end
 end
 ```
@@ -394,19 +395,19 @@ end
 You can use it like this:
 
 ```elixir
-user_a = %User{organization_id: 1}
-user_b = %User{organization_id: 2}
-organization = %Organization{id: 1}
+production_a = %Production{shot_list_id: 1}
+production_b = %Production{shot_list_id: 2}
+shot_list = %ShotList{id: 1}
 
-member_of_organization?(user_a, organization) # => true
-member_of_organization?(user_b, organization) # => false
+shot_list_included?(production_a, shot_list) # => true
+shot_list_included?(production_b, shot_list) # => false
 
-member_of_organization(user_a, organization) # => :ok
-member_of_organization(user_b, organization) # => {:error, :not_member_of_organization}
+shot_list_included(production_a, shot_list) # => :ok
+shot_list_included(production_b, shot_list) # => {:error, :missing_shot_list}
 
 Spek.all_of([
-  user_active([{:ctx, :user}]),
-  member_of_organization_check()
+  edit_session_active([{:ctx, :production}]),
+  shot_list_included_check()
 ])
 ```
 
@@ -459,9 +460,9 @@ end
 Or if you pass arguments to a check directly at runtime:
 
 ```elixir
-def some_fun(%User{} = user) do
-  UserChecks
-  |> Spek.check(:user_active, [user])
+def some_fun(%Production{} = production) do
+  ProductionChecks
+  |> Spek.check(:edit_session_active, [production])
   |> Spek.eval?()
 end
 ```
@@ -483,25 +484,26 @@ There are two special values that can be used in the check's `args`.
 Let's see this in an example. We'll use this check module:
 
 ```elixir
-defmodule MyApp.UserChecks do
-  def user_subscribed(%User{subscribed: true}), do: :ok
-  def user_subscribed(%User{subscribed: false}), do: {:error, :not_subscribed}i
+defmodule ProductionChecks do
+  def footage_ingested(%Production{footage_ingested: true}), do: :ok
+  def footage_ingested(%Production{footage_ingested: false}), do: {:error, :ingestion_missing}
 end
 ```
 
 And we build an expression from a single check that passes the whole context:
 
 ```elixir
-def send_notification_rule do
-  Spek.check(MyApp.UserChecks, :user_subscribed, [:ctx])
+def final_cut_release_rule do
+  Spek.check(ProductionChecks, :footage_ingested, [:ctx])
 end
 ```
 
-Then we build a function that does something only if the user is subscribed:
+Then we build a function that releases the final cut only if the footage is
+ingested:
 
 ```elixir
-def send_notification(%User{} = user, %Notification{} = notification) do
-  with :ok <- Spek.eval(send_notification_rule(), user) do
+def release_final_cut(%Production{} = production, %PipelineEvent{} = pipeline_event) do
+  with :ok <- Spek.eval(final_cut_release_rule(), production) do
     # ...
   end
 end
@@ -512,22 +514,22 @@ of data, we can pass a map or keyword list as context, and use the tuple syntax
 in the check definition.
 
 ```elixir
-def complex_rule do
+def publishable_rule do
   Spek.all_of([
-    Spek.check(MyApp.UserChecks, :user_subscribed, [{:ctx, :user}]),
-    Spek.check(MyApp.NotificationChecks, :other_check, [{:ctx, :notification}]),
+    Spek.check(ProductionChecks, :footage_ingested, [{:ctx, :production}]),
+    Spek.check(PipelineChecks, :render_cache_warmed, [{:ctx, :pipeline_event}]),
   ])
 end
 
-def do_something(%User{} = user, %Notification{} = notification) do
+def publish_if_publishable(%Production{} = production, %PipelineEvent{} = pipeline_event) do
   with :ok <-
-         Spek.eval(complex_rule(), user: user, notification: notification) do
+         Spek.eval(publishable_rule(), production: production, pipeline_event: pipeline_event) do
     # ...
   end
 end
 ```
 
-There are several evaluation function with different return values. Except for
+There are several evaluation functions with different return values. Except for
 functions ending with `_all`, evaluation stops early as soon as a final outcome
 can be determined.
 
@@ -554,47 +556,45 @@ transformations to simplify these expressions.
 Consider the following example:
 
 ```elixir
-defmodule MyApp.Rules do
+defmodule Rules do
   import Spek
 
-  alias MyApp.Checks
-
-  def enterprise_export do
+  def dailies_package_ready do
     all_of([
-      check(Checks, :account_active),
-      check(Checks, :user_has_export_permission),
-      check(Checks, :two_factor_enabled)
+      check(Checks, :proxy_media_available),
+      check(Checks, :color_grade_locked),
+      check(Checks, :audio_mix_completed)
     ])
   end
 
-  def admin_override do
+  def director_approval_override do
     all_of([
-      check(Checks, :account_active),
-      check(Checks, :user_is_admin)
+      check(Checks, :proxy_media_available),
+      check(Checks, :post_supervisor_approval)
     ])
   end
 
-  def export_customer_data do
+  def deliver_final_master do
     any_of([
       all_of([
-        enterprise_export(),
-        check(Checks, :gdpr_training_completed)
+        dailies_package_ready(),
+        check(Checks, :legal_clearance_completed)
       ]),
       all_of([
-        admin_override(),
-        check(Checks, :gdpr_training_completed)
+        director_approval_override(),
+        check(Checks, :legal_clearance_completed)
       ])
     ])
   end
 end
 ```
 
-The module defines two simple rules, `enterprise_export` and `admin_override`,
+The module defines two simple rules, `dailies_package_ready` and `director_approval_override`,
 and an additional third rule that combines both of them and adds additional
-checks. The return value of the `export_customer_data` function is:
+checks. The return value of the `deliver_final_master` function is:
 
 ```elixir
-# MyApp.Rules.export_customer_data()
+# Rules.deliver_final_master()
 
 %Spek.AnyOf{
   children: [
@@ -603,25 +603,25 @@ checks. The return value of the `export_customer_data` function is:
         %Spek.AllOf{
           children: [
             %Spek.Check{
-              module: MyApp.Checks,
-              fun: :account_active,
+              module: Checks,
+              fun: :proxy_media_available,
               args: [:ctx],
             },
             %Spek.Check{
-              module: MyApp.Checks,
-              fun: :user_has_export_permission,
+              module: Checks,
+              fun: :color_grade_locked,
               args: [:ctx],
             },
             %Spek.Check{
-              module: MyApp.Checks,
-              fun: :two_factor_enabled,
+              module: Checks,
+              fun: :audio_mix_completed,
               args: [:ctx],
             }
           ]
         },
         %Spek.Check{
-          module: MyApp.Checks,
-          fun: :gdpr_training_completed,
+          module: Checks,
+          fun: :legal_clearance_completed,
           args: [:ctx],
         }
       ]
@@ -631,20 +631,20 @@ checks. The return value of the `export_customer_data` function is:
         %Spek.AllOf{
           children: [
             %Spek.Check{
-              module: MyApp.Checks,
-              fun: :account_active,
+              module: Checks,
+              fun: :proxy_media_available,
               args: [:ctx],
             },
             %Spek.Check{
-              module: MyApp.Checks,
-              fun: :user_is_admin,
+              module: Checks,
+              fun: :post_supervisor_approval,
               args: [:ctx],
             }
           ]
         },
         %Spek.Check{
-          module: MyApp.Checks,
-          fun: :gdpr_training_completed,
+          module: Checks,
+          fun: :legal_clearance_completed,
           args: [:ctx],
         }
       ]
@@ -653,25 +653,25 @@ checks. The return value of the `export_customer_data` function is:
 }
 ```
 
-Note that both the `account_active?` check and the `gdpr_training_completed?`
+Note that both the `proxy_media_available?` check and the `legal_clearance_completed?`
 check appear in multiple branches. The `optimize` function will factor out
 these common checks.
 
 ```elixir
-# MyApp.Rules.export_customer_data() |> Spek.optimize()
+# Rules.deliver_final_master() |> Spek.optimize()
 
 %Spek.AllOf{
   children: [
     %Spek.Check{
-      module: MyApp.Checks,
-      fun: :gdpr_training_completed,
+      module: Checks,
+      fun: :legal_clearance_completed,
       args: [:ctx],
     },
     %Spek.AllOf{
       children: [
         %Spek.Check{
-          module: MyApp.Checks,
-          fun: :account_active,
+          module: Checks,
+          fun: :proxy_media_available,
           args: [:ctx],
         },
         %Spek.AnyOf{
@@ -679,20 +679,20 @@ these common checks.
             %Spek.AllOf{
               children: [
                 %Spek.Check{
-                  module: MyApp.Checks,
-                  fun: :user_has_export_permission,
+                  module: Checks,
+                  fun: :color_grade_locked,
                   args: [:ctx],
                 },
                 %Spek.Check{
-                  module: MyApp.Checks,
-                  fun: :two_factor_enabled,
+                  module: Checks,
+                  fun: :audio_mix_completed,
                   args: [:ctx],
                 }
               ]
             },
             %Spek.Check{
-              module: MyApp.Checks,
-              fun: :user_is_admin,
+              module: Checks,
+              fun: :post_supervisor_approval,
               args: [:ctx],
             }
           ]
@@ -707,38 +707,36 @@ If you want to avoid runtime overhead, you may opt to optimize the expressions
 at compile time:
 
 ```elixir
-defmodule MyApp.Rules do
+defmodule Rules do
   import Spek
 
-  alias MyApp.Checks
-
-  @enterprise_export all_of([
-                       check(Checks, :account_active),
-                       check(Checks, :user_has_export_permission),
-                       check(Checks, :two_factor_enabled)
+  @dailies_package_ready all_of([
+                       check(Checks, :proxy_media_available),
+                       check(Checks, :color_grade_locked),
+                       check(Checks, :audio_mix_completed)
                      ])
 
-  @admin_override all_of([
-                    check(Checks, :account_active),
-                    check(Checks, :user_is_admin)
+  @director_approval_override all_of([
+                    check(Checks, :proxy_media_available),
+                    check(Checks, :post_supervisor_approval)
                   ])
 
-  @export_customer_data any_of([
+  @deliver_final_master any_of([
                           all_of([
-                            @enterprise_export,
-                            check(Checks, :gdpr_training_completed)
+                            @dailies_package_ready,
+                            check(Checks, :legal_clearance_completed)
                           ]),
                           all_of([
-                            @admin_override,
-                            check(Checks, :gdpr_training_completed)
+                            @director_approval_override,
+                            check(Checks, :legal_clearance_completed)
                           ])
                         ])
 
-  @export_customer_data optimize(@export_customer_data)
+  @deliver_final_master optimize(@deliver_final_master)
 
-  def enterprise_export, do: @enterprise_export
-  def admin_override, do: @admin_override
-  def export_customer_data, do: @export_customer_data
+  def dailies_package_ready, do: @dailies_package_ready
+  def director_approval_override, do: @director_approval_override
+  def deliver_final_master, do: @deliver_final_master
 end
 ```
 
@@ -747,21 +745,19 @@ compile-time flag. In the following example, a Literal is created using a
 value known at compile time:
 
 ```elixir
-defmodule MyApp.Rules do
+defmodule Rules do
   import Spek
 
-  alias MyApp.Checks
+  @auto_render_enabled Application.compile_env(:spek, :auto_render_enabled, true)
 
-  @feature_enabled Application.compile_env(:spek, :feature_enabled, true)
-
-  @enterprise_export all_of([
-                       check(Checks, :account_active),
-                       check(Checks, :user_has_export_permission),
-                       literal(@feature_enabled)
+  @dailies_package_ready all_of([
+                       check(Checks, :proxy_media_available),
+                       check(Checks, :color_grade_locked),
+                       literal(@auto_render_enabled)
                      ])
-  @enterprise_export optimize(@enterprise_export)
+  @dailies_package_ready optimize(@dailies_package_ready)
 
-  def enterprise_export, do: @enterprise_export
+  def dailies_package_ready, do: @dailies_package_ready
 end
 ```
 
@@ -770,8 +766,8 @@ If the feature is enabled, the literal is removed from the expression:
 ```elixir
 %Spek.AllOf{
   children: [
-    %Spek.Check{module: MyApp.Checks, fun: :account_active, args: [:ctx]},
-    %Spek.Check{module: MyApp.Checks, fun: :user_has_export_permission, args: [:ctx]}
+    %Spek.Check{module: Checks, fun: :proxy_media_available, args: [:ctx]},
+    %Spek.Check{module: Checks, fun: :color_grade_locked, args: [:ctx]}
   ]
 }
 ```
