@@ -207,11 +207,14 @@ defmodule Spek do
 
   ## Example
 
-      iex> all_of([check(MyModule, :check_a, []), check(MyModule, :check_b, [])])
+      iex> all_of([
+      ...>   check(MyModule, :session_active, []),
+      ...>   check(MyModule, :permissions_valid, [])
+      ...> ])
       %Spek.AllOf{
         children: [
-          %Spek.Check{module: MyModule, fun: :check_a, args: []},
-          %Spek.Check{module: MyModule, fun: :check_b, args: []}
+          %Spek.Check{module: MyModule, fun: :session_active, args: []},
+          %Spek.Check{module: MyModule, fun: :permissions_valid, args: []}
         ]
       }
   """
@@ -226,11 +229,14 @@ defmodule Spek do
 
   ## Example
 
-      iex> all_of(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
+      iex> all_of(
+      ...>   check(RenderingChecks, :color_profile_valid, []),
+      ...>   check(RenderingChecks, :frame_rate_supported, [])
+      ...> )
       %Spek.AllOf{
         children: [
-          %Spek.Check{module: MyModule, fun: :check_a, args: []},
-          %Spek.Check{module: MyModule, fun: :check_b, args: []}
+          %Spek.Check{module: RenderingChecks, fun: :color_profile_valid, args: []},
+          %Spek.Check{module: RenderingChecks, fun: :frame_rate_supported, args: []}
         ]
       }
   """
@@ -245,11 +251,14 @@ defmodule Spek do
 
   ## Example
 
-      iex> any_of([check(MyModule, :check_a, []), check(MyModule, :check_b, [])])
+      iex> any_of([
+      ...>   check(AudioPipelineChecks, :waveform_detected, []),
+      ...>   check(AudioPipelineChecks, :silence_threshold_exceeded, [])
+      ...> ])
       %Spek.AnyOf{
         children: [
-          %Spek.Check{module: MyModule, fun: :check_a, args: []},
-          %Spek.Check{module: MyModule, fun: :check_b, args: []}
+          %Spek.Check{module: AudioPipelineChecks, fun: :waveform_detected, args: []},
+          %Spek.Check{module: AudioPipelineChecks, fun: :silence_threshold_exceeded, args: []}
         ]
       }
   """
@@ -264,11 +273,14 @@ defmodule Spek do
 
   ## Example
 
-      iex> any_of(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
+      iex> any_of(
+      ...>   check(SubtitleChecks, :burn_in_detected, []),
+      ...>   check(SubtitleChecks, :timecode_aligned, [])
+      ...> )
       %Spek.AnyOf{
         children: [
-          %Spek.Check{module: MyModule, fun: :check_a, args: []},
-          %Spek.Check{module: MyModule, fun: :check_b, args: []}
+          %Spek.Check{module: SubtitleChecks, fun: :burn_in_detected, args: []},
+          %Spek.Check{module: SubtitleChecks, fun: :timecode_aligned, args: []}
         ]
       }
   """
@@ -283,8 +295,8 @@ defmodule Spek do
 
   ## Example
 
-      iex> check(MyModule, :check_a, [0])
-      %Spek.Check{module: MyModule, fun: :check_a, args: [0]}
+      iex> check(WeatherChecks, :temperature_below_freezing, [0])
+      %Spek.Check{module: WeatherChecks, fun: :temperature_below_freezing, args: [0]}
   """
   @doc type: :builder
   @spec check(module, fun, Check.args()) :: Check.t()
@@ -299,12 +311,12 @@ defmodule Spek do
 
       iex> fail()
       %Spek.Literal{result: false, satisfied?: false}
-      
+
       iex> fail(:error)
       %Spek.Literal{result: :error, satisfied?: false}
-      
-      iex> fail({:error, :some_reason})
-      %Spek.Literal{result: {:error, :some_reason}, satisfied?: false}
+
+      iex> fail({:error, :insufficient_lighting})
+      %Spek.Literal{result: {:error, :insufficient_lighting}, satisfied?: false}
   """
   @doc type: :builder
   @spec fail(falsy) :: Literal.t()
@@ -323,8 +335,8 @@ defmodule Spek do
       iex> literal(:ok)
       %Spek.Literal{result: :ok, satisfied?: true}
 
-      iex> literal({:ok, "value"})
-      %Spek.Literal{result: {:ok, "value"}, satisfied?: true}
+      iex> literal({:ok, "render_queue_ready"})
+      %Spek.Literal{result: {:ok, "render_queue_ready"}, satisfied?: true}
 
       iex> literal(false)
       %Spek.Literal{result: false, satisfied?: false}
@@ -332,8 +344,8 @@ defmodule Spek do
       iex> literal(:error)
       %Spek.Literal{result: :error, satisfied?: false}
       
-      iex> literal({:error, :some_reason})
-      %Spek.Literal{result: {:error, :some_reason}, satisfied?: false}
+      iex> literal({:error, :codec_not_supported})
+      %Spek.Literal{result: {:error, :codec_not_supported}, satisfied?: false}
   """
   @doc type: :builder
   @spec literal(result) :: Literal.t()
@@ -346,12 +358,12 @@ defmodule Spek do
 
   ## Example
 
-      iex> nand(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
+      iex> nand(check(RenderChecks, :gpu_available, []), check(RenderChecks, :texture_cache_warm, []))
       %Spek.Not{
         expression: %Spek.AllOf{
           children: [
-            %Spek.Check{module: MyModule, fun: :check_a, args: []},
-            %Spek.Check{module: MyModule, fun: :check_b, args: []}
+            %Spek.Check{module: RenderChecks, fun: :gpu_available, args: []},
+            %Spek.Check{module: RenderChecks, fun: :texture_cache_warm, args: []}
           ]
         }
       }
@@ -370,9 +382,9 @@ defmodule Spek do
       iex> negate(literal(true))
       %Spek.Not{expression: %Spek.Literal{result: true, satisfied?: true}}
 
-      iex> negate(check(MyModule, :check_a, []))
+      iex> negate(check(EncodingChecks, :keyframe_aligned, []))
       %Spek.Not{
-        expression: %Spek.Check{module: MyModule, fun: :check_a, args: []}
+        expression: %Spek.Check{module: EncodingChecks, fun: :keyframe_aligned, args: []}
       }
   """
   @doc type: :builder
@@ -386,12 +398,12 @@ defmodule Spek do
 
   ## Example
 
-      iex> none([check(MyModule, :check_a, []), check(MyModule, :check_b, [])])
+      iex> none([check(AudioChecks, :noise_floor_exceeded, []), check(AudioChecks, :clipping_detected, [])])
       %Spek.Not{
         expression: %Spek.AnyOf{
           children: [
-            %Spek.Check{module: MyModule, fun: :check_a, args: []},
-            %Spek.Check{module: MyModule, fun: :check_b, args: []}
+            %Spek.Check{module: AudioChecks, fun: :noise_floor_exceeded, args: []},
+            %Spek.Check{module: AudioChecks, fun: :clipping_detected, args: []}
           ]
         }
       }
@@ -407,13 +419,13 @@ defmodule Spek do
 
   ## Example
 
-      iex> nor(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
+      iex> nor(check(VideoChecks, :frame_dropped, []), check(VideoChecks, :desync_detected, []))
       %Spek.Not{
         expression: %Spek.AnyOf{
           children: [
-            %Spek.Check{module: MyModule, fun: :check_a, args: []},
-            %Spek.Check{module: MyModule, fun: :check_b, args: []}
-          ],
+            %Spek.Check{module: VideoChecks, fun: :frame_dropped, args: []},
+            %Spek.Check{module: VideoChecks, fun: :desync_detected, args: []}
+          ]
         }
       }
   """
@@ -434,8 +446,8 @@ defmodule Spek do
       iex> pass(:ok)
       %Spek.Literal{result: :ok, satisfied?: true}
       
-      iex> pass({:ok, "value"})
-      %Spek.Literal{result: {:ok, "value"}, satisfied?: true}
+      iex> pass({:ok, "proxy_stream_ready"})
+      %Spek.Literal{result: {:ok, "proxy_stream_ready"}, satisfied?: true}
   """
   @doc type: :builder
   @spec pass(truthy) :: Literal.t()
@@ -448,16 +460,16 @@ defmodule Spek do
 
   ## Example
 
-      iex> xor(check(MyModule, :check_a, []), check(MyModule, :check_b, []))
+      iex> xor(check(PipelineChecks, :transcode_complete, []), check(PipelineChecks, :thumbnail_generated, []))
       %Spek.AnyOf{
         children: [
           %Spek.AllOf{
             children: [
-              %Spek.Check{module: MyModule, fun: :check_a, args: []},
+              %Spek.Check{module: PipelineChecks, fun: :transcode_complete, args: []},
               %Spek.Not{
                 expression: %Spek.Check{
-                  module: MyModule,
-                  fun: :check_b,
+                  module: PipelineChecks,
+                  fun: :thumbnail_generated,
                   args: []
                 }
               }
@@ -467,12 +479,12 @@ defmodule Spek do
             children: [
               %Spek.Not{
                 expression: %Spek.Check{
-                  module: MyModule,
-                  fun: :check_a,
+                  module: PipelineChecks,
+                  fun: :transcode_complete,
                   args: []
                 }
               },
-              %Spek.Check{module: MyModule, fun: :check_b, args: []}
+              %Spek.Check{module: PipelineChecks, fun: :thumbnail_generated, args: []}
             ]
           }
         ]
@@ -497,14 +509,14 @@ defmodule Spek do
   ## Examples
 
       iex> eval?(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hola, amiga"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "scene_042_render_complete"
       ...> )
       true
-      
+
       iex> eval?(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hello, friend"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "shot_042_render_complete"
       ...> )
       false
   """
@@ -545,14 +557,14 @@ defmodule Spek do
   ## Examples
 
       iex> eval(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hola, amiga"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "scene_042_render_complete"
       ...> )
       :ok
-      
+
       iex> eval(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hello, friend"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "shot_042_render_complete"
       ...> )
       {:error, %Spek.EvaluationError{message: "rule evaluation failed"}}
   """
@@ -574,14 +586,14 @@ defmodule Spek do
   ## Examples
 
       iex> eval!(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hola, amiga"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "scene_042_render_complete"
       ...> )
       :ok
-      
+
       iex> eval!(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hello, friend"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "shot_042_render_complete"
       ...> )
       ** (Spek.EvaluationError) rule evaluation failed
   """
@@ -605,31 +617,31 @@ defmodule Spek do
   ## Examples
 
       iex> eval_tree(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hola, amiga"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "scene_042_render_complete"
       ...> )
       {
         :ok,
         %Spek.Check{
           module: String,
           fun: :starts_with?,
-          args: [:ctx, "hola"],
+          args: [:ctx, "scene_"],
           result: true,
           satisfied?: true
         }
       }
-      
+
       iex> eval_tree(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hello, friend"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "shot_042_render_complete"
       ...> )
       {
         :error,
         %Spek.EvaluationError{
           expression: %Spek.Check{
-            args: [:ctx, "hola"],
-            fun: :starts_with?,
             module: String,
+            fun: :starts_with?,
+            args: [:ctx, "scene_"],
             result: false,
             satisfied?: false
           },
@@ -663,20 +675,20 @@ defmodule Spek do
   ## Examples
 
       iex> eval_tree!(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hola, amiga"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "scene_042_render_complete"
       ...> )
       %Spek.Check{
         module: String,
         fun: :starts_with?,
-        args: [:ctx, "hola"],
+        args: [:ctx, "scene_"],
         result: true,
         satisfied?: true
       }
-      
+
       iex> eval_tree!(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hello, friend"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "shot_042_render_complete"
       ...> )
       ** (Spek.EvaluationError) rule evaluation failed
   """
@@ -703,10 +715,10 @@ defmodule Spek do
 
       iex> eval_tree_all(
       ...>   all_of([
-      ...>     %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>     %Check{module: String, fun: :ends_with?, args: [:ctx, "amiga"]}
+      ...>     %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>     %Check{module: String, fun: :ends_with?, args: [:ctx, "_render_complete"]}
       ...>   ]),
-      ...>   "hola, amiga"
+      ...>   "scene_042_render_complete"
       ...> )
       {
         :ok,
@@ -715,14 +727,14 @@ defmodule Spek do
             %Spek.Check{
               module: String,
               fun: :starts_with?,
-              args: [:ctx, "hola"],
+              args: [:ctx, "scene_"],
               result: true,
               satisfied?: true
             },
             %Spek.Check{
               module: String,
               fun: :ends_with?,
-              args: [:ctx, "amiga"],
+              args: [:ctx, "_render_complete"],
               result: true,
               satisfied?: true
             }
@@ -733,10 +745,10 @@ defmodule Spek do
 
       iex> eval_tree_all(
       ...>   all_of([
-      ...>     %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>     %Check{module: String, fun: :ends_with?, args: [:ctx, "amiga"]}
+      ...>     %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>     %Check{module: String, fun: :ends_with?, args: [:ctx, "_render_complete"]}
       ...>   ]),
-      ...>   "hola, amigo"
+      ...>   "shot_042_render_complete"
       ...> )
       {
         :error,
@@ -746,16 +758,16 @@ defmodule Spek do
               %Spek.Check{
                 module: String,
                 fun: :starts_with?,
-                args: [:ctx, "hola"],
-                result: true,
-                satisfied?: true
+                args: [:ctx, "scene_"],
+                result: false,
+                satisfied?: false
               },
               %Spek.Check{
                 module: String,
                 fun: :ends_with?,
-                args: [:ctx, "amiga"],
-                result: false,
-                satisfied?: false
+                args: [:ctx, "_render_complete"],
+                result: true,
+                satisfied?: true
               }
             ],
             satisfied?: false
@@ -791,10 +803,10 @@ defmodule Spek do
 
       iex> eval_tree_all!(
       ...>   any_of([
-      ...>     %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>     %Check{module: String, fun: :ends_with?, args: [:ctx, "amiga"]}
+      ...>     %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>     %Check{module: String, fun: :ends_with?, args: [:ctx, "_render_complete"]}
       ...>   ]),
-      ...>   "hola, amiga"
+      ...>   "scene_042_render_complete"
       ...> )
       %Spek.AnyOf{
         satisfied?: true,
@@ -802,14 +814,14 @@ defmodule Spek do
           %Spek.Check{
             module: String,
             fun: :starts_with?,
-            args: [:ctx, "hola"],
+            args: [:ctx, "scene_"],
             result: true,
             satisfied?: true
           },
           %Spek.Check{
             module: String,
             fun: :ends_with?,
-            args: [:ctx, "amiga"],
+            args: [:ctx, "_render_complete"],
             result: true,
             satisfied?: true
           }
@@ -817,8 +829,8 @@ defmodule Spek do
       }
 
       iex> eval_tree_all!(
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]},
-      ...>   "hello, friend"
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]},
+      ...>   "shot_042_render_complete"
       ...> )
       ** (Spek.EvaluationError) rule evaluation failed
   """
@@ -940,10 +952,10 @@ defmodule Spek do
   ## Example
 
       iex> filter(
-      ...>   ["hello, friend", "hola, amiga"],
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hola"]}
+      ...>   ["scene_042_render_complete", "shot_017_proxy_ready"],
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]}
       ...> )
-      ["hola, amiga"]
+      ["scene_042_render_complete"]
   """
   @doc type: :evaluation
   @spec filter(Enumerable.t(), expression) :: Enumerable.t()
@@ -958,10 +970,10 @@ defmodule Spek do
   ## Example
 
       iex> reject(
-      ...>   ["hello, friend", "hola, amiga"],
-      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "hello"]}
+      ...>   ["scene_042_render_complete", "shot_017_proxy_ready"],
+      ...>   %Check{module: String, fun: :starts_with?, args: [:ctx, "scene_"]}
       ...> )
-      ["hola, amiga"]
+      ["shot_017_proxy_ready"]
   """
   @doc type: :evaluation
   @spec reject(Enumerable.t(), expression) :: Enumerable.t()
@@ -980,33 +992,33 @@ defmodule Spek do
       ...>   children: [
       ...>     %AllOf{
       ...>       children: [
-      ...>         %Check{module: MyModule, fun: :check1, args: []},
-      ...>         %Check{module: MyModule, fun: :check2, args: []}
+      ...>         %Check{module: RenderChecks, fun: :gpu_available, args: []},
+      ...>         %Check{module: RenderChecks, fun: :texture_cache_warm, args: []}
       ...>       ]
       ...>     },
       ...>     %AllOf{
       ...>       children: [
-      ...>         %Check{module: MyModule, fun: :check3, args: []},
-      ...>         %Check{module: MyModule, fun: :check1, args: []}
+      ...>         %Check{module: RenderChecks, fun: :color_space_valid, args: []},
+      ...>         %Check{module: RenderChecks, fun: :gpu_available, args: []}
       ...>       ]
       ...>     },
-      ...>     %Check{module: MyModule, fun: :check4, args: []}
+      ...>     %Check{module: RenderChecks, fun: :fallback_renderer_enabled, args: []}
       ...>   ]
       ...> })
       %AnyOf{
         children: [
           %AllOf{
             children: [
-              %Check{module: MyModule, fun: :check1, args: []},
+              %Check{module: RenderChecks, fun: :gpu_available, args: []},
               %AnyOf{
                 children: [
-                  %Check{module: MyModule, fun: :check2, args: []},
-                  %Check{module: MyModule, fun: :check3, args: []}
+                  %Check{module: RenderChecks, fun: :texture_cache_warm, args: []},
+                  %Check{module: RenderChecks, fun: :color_space_valid, args: []}
                 ]
               }
             ]
           },
-          %Check{module: MyModule, fun: :check4, args: []}
+          %Check{module: RenderChecks, fun: :fallback_renderer_enabled, args: []}
         ]
       }
 
