@@ -12,13 +12,17 @@ defmodule Spek.EvaluationError do
   and their results. Depending on the evaluation function used, this may be the
   complete expression, or only the parts of it that were evaluated until a
   decision was made.
+
+  `results` contains the collected error reasons as returned by
+  `Spek.collect_results/2`.
   """
   @type t :: %__MODULE__{
           message: String.t(),
-          expression: Spek.expression() | nil
+          expression: Spek.expression() | nil,
+          results: [term] | nil
         }
 
-  defexception [:message, :expression]
+  defexception [:message, :expression, :results]
 
   def message(exception) do
     exception.message || @default_message
@@ -41,5 +45,16 @@ defmodule Spek.EvaluationError do
       message: message,
       expression: expression
     }
+  end
+
+  @doc """
+  Collects the error results with `Spek.collect_results/2` and puts them into
+  the given `EvaluationError` struct.
+  """
+  @spec put_results(t) :: t
+  def put_results(%__MODULE__{expression: nil} = error), do: error
+
+  def put_results(%__MODULE__{expression: expression} = error) do
+    %{error | results: Spek.collect_results(expression, :error)}
   end
 end
