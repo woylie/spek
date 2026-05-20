@@ -1366,6 +1366,185 @@ defmodule Spek do
     end
   end
 
+  @doc """
+  Collects all tagged results from an expression into a list.
+
+  Results are returned without their `:ok` / `:error` tags.
+
+  ## Examples
+
+  Literals and checks contribute only tagged tuple payloads. The plain result
+  values `:ok`, `:error`, `true` and `false` are not returned.
+
+      iex> Spek.collect_results(
+      ...>   %Literal{result: {:ok, "good"}, satisfied?: true}
+      ...> )
+      ["good"]
+
+      iex> Spek.collect_results(
+      ...>   %Literal{result: true, satisfied?: true}
+      ...> )
+      []
+
+      iex> Spek.collect_results(
+      ...>   %Check{
+      ...>     module: Checks,
+      ...>     fun: :some_check,
+      ...>     args: [],
+      ...>     result: {:error, "bad"},
+      ...>     satisfied?: false
+      ...>   }
+      ...> )
+      ["bad"]
+
+  The results of nested expressions are flattened.
+
+      iex> expression =
+      ...>   %AllOf{
+      ...>     children: [
+      ...>       %Literal{result: {:ok, "a"}, satisfied?: true},
+      ...>       %Literal{result: {:error, "b"}, satisfied?: false},
+      ...>       %Check{
+      ...>         module: Checks,
+      ...>         fun: :some_check,
+      ...>         args: [],
+      ...>         result: {:ok, "c"},
+      ...>         satisfied?: true
+      ...>       }
+      ...>     ]
+      ...>   }
+      iex> Spek.collect_results(expression)
+      ["a", "b", "c"]
+  """
+  @doc type: :evaluation
+  @spec collect_results(expression) :: [term]
+  def collect_results(expression) do
+    expression
+    |> do_collect_results()
+    |> List.flatten()
+  end
+
+  defp do_collect_results(%Check{result: {:ok, v}}), do: [v]
+  defp do_collect_results(%Check{result: {:error, v}}), do: [v]
+  defp do_collect_results(%Check{}), do: []
+
+  defp do_collect_results(%Literal{result: {:ok, v}}), do: [v]
+  defp do_collect_results(%Literal{result: {:error, v}}), do: [v]
+  defp do_collect_results(%Literal{}), do: []
+
+  defp do_collect_results(%Not{}), do: []
+
+  defp do_collect_results(%AllOf{children: children}) do
+    Enum.map(children, &do_collect_results/1)
+  end
+
+  defp do_collect_results(%AnyOf{children: children}) do
+    Enum.map(children, &do_collect_results/1)
+  end
+
+  @doc """
+  Collects the success or error results of an expression into a list.
+
+  ## Examples
+
+  The returned list only contains results using `:ok` or `:error` tuples.
+
+      iex> Spek.collect_results(
+      ...>   %Literal{result: {:ok, "good"}, satisfied?: true},
+      ...>   :ok
+      ...> )
+      ["good"]
+
+      iex> Spek.collect_results(
+      ...>   %Check{
+      ...>     module: Checks,
+      ...>     fun: :some_check,
+      ...>     args: [],
+      ...>     result: {:error, "bad"},
+      ...>     satisfied?: false
+      ...>   },
+      ...>   :error
+      ...> )
+      ["bad"]
+
+  The plain result values `:ok`, `:error`, `true` and `false` are not returned.
+
+      iex> Spek.collect_results(
+      ...>   %Check{
+      ...>     module: Checks,
+      ...>     fun: :some_check,
+      ...>     args: [],
+      ...>     result: false,
+      ...>     satisfied?: false
+      ...>   },
+      ...>   :error
+      ...> )
+      []
+
+  The results of nested expressions are flattened.
+
+      iex> expression =
+      ...>   %AllOf{
+      ...>     children: [
+      ...>       %Literal{result: {:ok, "a"}, satisfied?: true},
+      ...>       %Literal{result: {:error, "b"}, satisfied?: false},
+      ...>       %Check{
+      ...>         module: Checks,
+      ...>         fun: :some_check,
+      ...>         args: [],
+      ...>         result: {:ok, "c"},
+      ...>         satisfied?: true
+      ...>       }
+      ...>     ]
+      ...>   }
+      iex> Spek.collect_results(expression, :ok)
+      ["a", "c"]
+      iex> Spek.collect_results(expression, :error)
+      ["b"]
+
+  `Not` reverses which tagged results are returned:
+
+      iex> expression =
+      ...>   %Not{
+      ...>     satisfied?: true,
+      ...>     expression: %Literal{
+      ...>       result: {:error, "bad"},
+      ...>       satisfied?: false
+      ...>     }
+      ...>   }
+      iex> Spek.collect_results(expression, :ok)
+      ["bad"]
+      iex> Spek.collect_results(expression, :error)
+      []
+  """
+  @doc type: :evaluation
+  @spec collect_results(expression, :ok | :error) :: [term]
+  def collect_results(expression, only) when only in [:ok, :error] do
+    expression
+    |> do_collect_results(only == :ok)
+    |> List.flatten()
+  end
+
+  defp do_collect_results(%Check{result: {:ok, v}}, true), do: [v]
+  defp do_collect_results(%Check{result: {:error, v}}, false), do: [v]
+  defp do_collect_results(%Check{}, _), do: []
+
+  defp do_collect_results(%Literal{result: {:ok, v}}, true), do: [v]
+  defp do_collect_results(%Literal{result: {:error, v}}, false), do: [v]
+  defp do_collect_results(%Literal{}, _), do: []
+
+  defp do_collect_results(%Not{expression: expression}, only) do
+    do_collect_results(expression, not only)
+  end
+
+  defp do_collect_results(%AllOf{children: children}, only) do
+    Enum.map(children, &do_collect_results(&1, only))
+  end
+
+  defp do_collect_results(%AnyOf{children: children}, only) do
+    Enum.map(children, &do_collect_results(&1, only))
+  end
+
   @doc false
   def to_boolean(bool) when is_boolean(bool), do: bool
   def to_boolean(:ok), do: true

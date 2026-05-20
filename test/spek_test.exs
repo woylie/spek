@@ -1396,4 +1396,300 @@ defmodule SpekTest do
              }) == %Check{module: Checks, fun: :check1, args: []}
     end
   end
+
+  describe "collect_results/1" do
+    test "returns result of a literal" do
+      test_cases = [
+        {true, true, []},
+        {:ok, true, []},
+        {false, false, []},
+        {:error, false, []},
+        {{:ok, "good"}, true, ["good"]},
+        {{:error, "bad"}, false, ["bad"]}
+      ]
+
+      for {result, satisfied?, expected} <- test_cases do
+        assert Spek.collect_results(%Literal{
+                 result: result,
+                 satisfied?: satisfied?
+               }) == expected
+      end
+    end
+
+    test "returns result of a check" do
+      test_cases = [
+        {true, true, []},
+        {:ok, true, []},
+        {false, false, []},
+        {:error, false, []},
+        {{:ok, "good"}, true, ["good"]},
+        {{:error, "bad"}, false, ["bad"]}
+      ]
+
+      for {result, satisfied?, expected} <- test_cases do
+        assert Spek.collect_results(%Check{
+                 module: Checks,
+                 fun: :some_check,
+                 args: [],
+                 result: result,
+                 satisfied?: satisfied?
+               }) == expected
+      end
+    end
+
+    test "handles Not" do
+      assert Spek.collect_results(%Not{satisfied?: true}) == []
+    end
+
+    test "returns results of an AllOf" do
+      assert Spek.collect_results(%AllOf{
+               children: [
+                 %Literal{result: false, satisfied?: false},
+                 %Check{
+                   module: Checks,
+                   fun: :some_check,
+                   args: [],
+                   result: {:ok, "good"},
+                   satisfied?: true
+                 },
+                 %Literal{result: {:error, "bad"}, satisfied?: false}
+               ]
+             }) == ["good", "bad"]
+    end
+
+    test "returns results of an AnyOf" do
+      assert Spek.collect_results(%AnyOf{
+               children: [
+                 %Literal{result: false, satisfied?: false},
+                 %Check{
+                   module: Checks,
+                   fun: :some_check,
+                   args: [],
+                   result: {:ok, "good"},
+                   satisfied?: true
+                 },
+                 %Literal{result: {:error, "bad"}, satisfied?: false}
+               ]
+             }) == ["good", "bad"]
+    end
+
+    test "returns nested results" do
+      assert Spek.collect_results(%AllOf{
+               children: [
+                 %Literal{result: false, satisfied?: false},
+                 %AllOf{
+                   children: [
+                     %Check{
+                       module: Checks,
+                       fun: :some_check,
+                       args: [],
+                       result: {:ok, "good"},
+                       satisfied?: true
+                     },
+                     %Literal{result: {:error, "bad"}, satisfied?: false}
+                   ]
+                 }
+               ]
+             }) == ["good", "bad"]
+    end
+  end
+
+  describe "collect_results/2" do
+    test "filters success results of literal" do
+      test_cases = [
+        {true, true, []},
+        {:ok, true, []},
+        {false, false, []},
+        {:error, false, []},
+        {{:ok, "good"}, true, ["good"]},
+        {{:error, "bad"}, false, []}
+      ]
+
+      for {result, satisfied?, expected} <- test_cases do
+        assert Spek.collect_results(
+                 %Literal{
+                   result: result,
+                   satisfied?: satisfied?
+                 },
+                 :ok
+               ) == expected
+      end
+    end
+
+    test "filters error results of literal" do
+      test_cases = [
+        {true, true, []},
+        {:ok, true, []},
+        {false, false, []},
+        {:error, false, []},
+        {{:ok, "good"}, true, []},
+        {{:error, "bad"}, false, ["bad"]}
+      ]
+
+      for {result, satisfied?, expected} <- test_cases do
+        assert Spek.collect_results(
+                 %Literal{
+                   result: result,
+                   satisfied?: satisfied?
+                 },
+                 :error
+               ) == expected
+      end
+    end
+
+    test "filters success results of a check" do
+      test_cases = [
+        {true, true, []},
+        {:ok, true, []},
+        {false, false, []},
+        {:error, false, []},
+        {{:ok, "good"}, true, ["good"]},
+        {{:error, "bad"}, false, []}
+      ]
+
+      for {result, satisfied?, expected} <- test_cases do
+        assert Spek.collect_results(
+                 %Check{
+                   module: Checks,
+                   fun: :some_check,
+                   args: [],
+                   result: result,
+                   satisfied?: satisfied?
+                 },
+                 :ok
+               ) == expected
+      end
+    end
+
+    test "filters error results of a check" do
+      test_cases = [
+        {true, true, []},
+        {:ok, true, []},
+        {false, false, []},
+        {:error, false, []},
+        {{:ok, "good"}, true, []},
+        {{:error, "bad"}, false, ["bad"]}
+      ]
+
+      for {result, satisfied?, expected} <- test_cases do
+        assert Spek.collect_results(
+                 %Check{
+                   module: Checks,
+                   fun: :some_check,
+                   args: [],
+                   result: result,
+                   satisfied?: satisfied?
+                 },
+                 :error
+               ) == expected
+      end
+    end
+
+    test "reverses filter within a Not" do
+      test_cases = [
+        # literal.result, literal.satisfied?, arg, expected
+        {{:ok, "good"}, true, :ok, []},
+        {{:ok, "good"}, true, :error, ["good"]},
+        {{:error, "bad"}, false, :ok, ["bad"]},
+        {{:error, "bad"}, false, :error, []}
+      ]
+
+      for {result, satisfied?, only, expected} <- test_cases do
+        assert Spek.collect_results(
+                 %Not{
+                   satisfied?: not satisfied?,
+                   expression: %Literal{result: result, satisfied?: satisfied?}
+                 },
+                 only
+               ) == expected
+      end
+    end
+
+    test "filters results of an AllOf" do
+      expression =
+        %AllOf{
+          children: [
+            %Literal{result: false, satisfied?: false},
+            %Check{
+              module: Checks,
+              fun: :some_check,
+              args: [],
+              result: {:ok, "good"},
+              satisfied?: true
+            },
+            %Literal{result: {:error, "bad"}, satisfied?: false}
+          ]
+        }
+
+      assert Spek.collect_results(expression, :ok) == ["good"]
+      assert Spek.collect_results(expression, :error) == ["bad"]
+    end
+
+    test "filters results of an AnyOf" do
+      expression =
+        %AnyOf{
+          children: [
+            %Literal{result: false, satisfied?: false},
+            %Check{
+              module: Checks,
+              fun: :some_check,
+              args: [],
+              result: {:ok, "good"},
+              satisfied?: true
+            },
+            %Literal{result: {:error, "bad"}, satisfied?: false}
+          ]
+        }
+
+      assert Spek.collect_results(expression, :ok) == ["good"]
+      assert Spek.collect_results(expression, :error) == ["bad"]
+    end
+
+    test "filters results of a nested expression" do
+      expression =
+        %AllOf{
+          children: [
+            %Literal{
+              result: {:ok, "literal good"},
+              satisfied?: true
+            },
+            %Check{
+              module: Checks,
+              fun: :some_check,
+              args: [],
+              result: {:error, "check bad"},
+              satisfied?: false
+            },
+            %Not{
+              satisfied?: true,
+              expression: %AnyOf{
+                children: [
+                  %Literal{
+                    result: {:ok, "nested literal good"},
+                    satisfied?: true
+                  },
+                  %Check{
+                    module: Checks,
+                    fun: :some_check,
+                    args: [],
+                    result: {:error, "nested check bad"},
+                    satisfied?: false
+                  }
+                ]
+              }
+            }
+          ]
+        }
+
+      assert Spek.collect_results(expression, :ok) == [
+               "literal good",
+               "nested check bad"
+             ]
+
+      assert Spek.collect_results(expression, :error) == [
+               "check bad",
+               "nested literal good"
+             ]
+    end
+  end
 end
