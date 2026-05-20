@@ -943,6 +943,164 @@ defmodule Spek do
 
   defp replace_arg(arg, _), do: arg
 
+  @doc """
+  Evaluates the given expression with `eval_tree/2` and collects the results
+  into a list with `collect_results/2`.
+
+  In the success case, an `:ok` tuple with the list of success results is
+  returned.
+
+  In the error case, an `:error` tuple with a `Spek.EvaluationError` struct that
+  contains both the evaluation tree and the list of error results.
+
+  ## Examples
+
+      iex> eval_collect(
+      ...>   %Check{module: Date, fun: :from_iso8601, args: [:ctx]},
+      ...>   "2000-01-12"
+      ...> )
+      {:ok, [~D[2000-01-12]]}
+
+      iex> eval_collect(
+      ...>   %Check{module: Date, fun: :from_iso8601, args: [:ctx]},
+      ...>   "2000-01.12"
+      ...> )
+      {
+        :error,
+        %Spek.EvaluationError{
+          expression: %Spek.Check{
+            module: Date,
+            fun: :from_iso8601,
+            args: [:ctx],
+            result: {:error, :invalid_format},
+            satisfied?: false
+          },
+          results: [:invalid_format],
+          message: "rule evaluation failed"
+        }
+      }
+  """
+  @doc type: :evaluation
+  @spec eval_collect(expression, context) ::
+          {:ok, [term]} | {:error, EvaluationError.t()}
+  def eval_collect(expression, context \\ []) do
+    case eval_tree(expression, context) do
+      {:ok, expression} -> {:ok, collect_results(expression, :ok)}
+      {:error, error} -> {:error, EvaluationError.put_results(error)}
+    end
+  end
+
+  @doc """
+  Evaluates the given expression with `eval_tree/2` and collects the results
+  into a list with `collect_results/2`.
+
+  In the success case, the list of success results is returned.
+
+  In the error case, a `Spek.EvaluationError` exception is raised that
+  contains both the evaluation tree and the list of error results.
+
+  ## Examples
+
+      iex> eval_collect!(
+      ...>   %Check{module: Date, fun: :from_iso8601, args: [:ctx]},
+      ...>   "2000-01-12"
+      ...> )
+      [~D[2000-01-12]]
+
+      iex> eval_collect!(
+      ...>   %Check{module: Date, fun: :from_iso8601, args: [:ctx]},
+      ...>   "2000-01.12"
+      ...> )
+      ** (Spek.EvaluationError) rule evaluation failed
+  """
+  @doc type: :evaluation
+  @spec eval_collect!(expression, context) :: [term] | no_return
+  def eval_collect!(expression, context \\ []) do
+    case eval_tree(expression, context) do
+      {:ok, expression} -> collect_results(expression, :ok)
+      {:error, error} -> raise EvaluationError.put_results(error)
+    end
+  end
+
+  @doc """
+  Evaluates the given expression with `eval_tree_all/2` and collects the results
+  into a list with `collect_results/2`.
+
+  In the success case, an `:ok` tuple with the list of success results is
+  returned.
+
+  In the error case, an `:error` tuple with a `Spek.EvaluationError` struct that
+  contains both the evaluation tree and the list of error results.
+
+  ## Examples
+
+      iex> eval_collect_all(
+      ...>   %Check{module: Date, fun: :from_iso8601, args: [:ctx]},
+      ...>   "2000-01-12"
+      ...> )
+      {:ok, [~D[2000-01-12]]}
+
+      iex> eval_collect_all(
+      ...>   %Check{module: Date, fun: :from_iso8601, args: [:ctx]},
+      ...>   "2000-01.12"
+      ...> )
+      {
+        :error,
+        %Spek.EvaluationError{
+          expression: %Spek.Check{
+            module: Date,
+            fun: :from_iso8601,
+            args: [:ctx],
+            result: {:error, :invalid_format},
+            satisfied?: false
+          },
+          results: [:invalid_format],
+          message: "rule evaluation failed"
+        }
+      }
+  """
+  @doc type: :evaluation
+  @spec eval_collect_all(expression, context) ::
+          {:ok, [term]} | {:error, EvaluationError.t()}
+  def eval_collect_all(expression, context \\ []) do
+    case eval_tree_all(expression, context) do
+      {:ok, expression} -> {:ok, collect_results(expression, :ok)}
+      {:error, error} -> {:error, EvaluationError.put_results(error)}
+    end
+  end
+
+  @doc """
+  Evaluates the given expression with `eval_tree_all/2` and collects the results
+  into a list with `collect_results/2`.
+
+  In the success case, the list of success results is returned.
+
+  In the error case, a `Spek.EvaluationError` exception is raised that
+  contains both the evaluation tree and the list of error results.
+
+  ## Examples
+
+      iex> eval_collect_all!(
+      ...>   %Check{module: Date, fun: :from_iso8601, args: [:ctx]},
+      ...>   "2000-01-12"
+      ...> )
+      [~D[2000-01-12]]
+
+      iex> eval_collect_all!(
+      ...>   %Check{module: Date, fun: :from_iso8601, args: [:ctx]},
+      ...>   "2000-01.12"
+      ...> )
+      ** (Spek.EvaluationError) rule evaluation failed
+  """
+  @doc type: :evaluation
+  @spec eval_collect_all!(expression, context) :: [term] | no_return
+  def eval_collect_all!(expression, context \\ []) do
+    case eval_tree_all(expression, context) do
+      {:ok, expression} -> collect_results(expression, :ok)
+      {:error, error} -> raise EvaluationError.put_results(error)
+    end
+  end
+
   ## Filter/reject
 
   @doc """
