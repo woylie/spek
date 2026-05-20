@@ -650,7 +650,7 @@ defmodule Spek do
       }
   """
   @doc type: :evaluation
-  @spec eval_tree(expression, term) ::
+  @spec eval_tree(expression, context) ::
           {:ok, expression} | {:error, EvaluationError.t()}
   def eval_tree(expression, context \\ []) do
     case do_eval_tree(expression, context, :halt) do
@@ -693,7 +693,7 @@ defmodule Spek do
       ** (Spek.EvaluationError) rule evaluation failed
   """
   @doc type: :evaluation
-  @spec eval_tree!(expression, term) :: expression | no_return
+  @spec eval_tree!(expression, context) :: expression | no_return
   def eval_tree!(expression, context \\ []) do
     case do_eval_tree(expression, context, :halt) do
       %{satisfied?: true} = evaluated_expression ->
@@ -777,7 +777,7 @@ defmodule Spek do
       }
   """
   @doc type: :evaluation
-  @spec eval_tree_all(expression, term) ::
+  @spec eval_tree_all(expression, context) ::
           {:ok, expression} | {:error, EvaluationError.t()}
   def eval_tree_all(expression, context \\ []) do
     case do_eval_tree(expression, context, :cont) do
@@ -835,7 +835,7 @@ defmodule Spek do
       ** (Spek.EvaluationError) rule evaluation failed
   """
   @doc type: :evaluation
-  @spec eval_tree_all!(expression, term) :: expression | no_return
+  @spec eval_tree_all!(expression, context) :: expression | no_return
   def eval_tree_all!(expression, context \\ []) do
     case do_eval_tree(expression, context, :cont) do
       %{satisfied?: true} = evaluated_expression ->
