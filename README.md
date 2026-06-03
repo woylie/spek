@@ -783,7 +783,5 @@ documentation of `Spek.optimize/1`.
 
 ## Related libraries
 
-The evaluation and optimization engine is based on the one introduced in
-[LetMe](https://github.com/woylie/let_me) 2.0.0. If you need to evaluate rules
-in the context of authorization policies, you may find LetMe's macro DSL
-useful.
+[LetMe](https://github.com/woylie/let_me) is an authorization DSL that uses
+Spek.
