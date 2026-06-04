@@ -17,6 +17,14 @@ defmodule Spek.MacrosTest do
       account.balance >= 0
     end
 
+    defcheck rich_atom(account, args: [:ctx]) do
+      if account.balance >= 100_000, do: :ok, else: :error
+    end
+
+    defcheck rich_tuple(account, args: [:ctx]) do
+      if account.balance >= 100_000, do: {:ok, :rich}, else: {:error, :not_rich}
+    end
+
     defcheck matching_organization(user, organization,
                args: [{:ctx, :user}, {:ctx, :organization}],
                reason: :no_organization_match
@@ -34,6 +42,22 @@ defmodule Spek.MacrosTest do
 
     defcheck always_false do
       false
+    end
+
+    defcheck always_ok do
+      :ok
+    end
+
+    defcheck always_error do
+      :error
+    end
+
+    defcheck always_ok_tuple do
+      {:ok, :good}
+    end
+
+    defcheck always_error_tuple do
+      {:error, :bad}
     end
   end
 
@@ -128,12 +152,80 @@ defmodule Spek.MacrosTest do
       assert Checks.always_false() == {:error, :failed}
     end
 
+    test "can define check without args and opts that is always :ok" do
+      assert Checks.always_ok_check() == %Spek.Literal{
+               result: :ok,
+               satisfied?: true
+             }
+
+      assert Checks.always_ok?() == true
+      assert Checks.always_ok() == :ok
+    end
+
+    test "can define check without args and opts that is always :error" do
+      assert Checks.always_error_check() == %Spek.Literal{
+               result: :error,
+               satisfied?: false
+             }
+
+      assert Checks.always_error?() == false
+      assert Checks.always_error() == :error
+    end
+
+    test "can define check without args and opts that is always :ok tuple" do
+      assert Checks.always_ok_tuple_check() == %Spek.Literal{
+               result: {:ok, :good},
+               satisfied?: true
+             }
+
+      assert Checks.always_ok_tuple?() == true
+      assert Checks.always_ok_tuple() == {:ok, :good}
+    end
+
+    test "can define check without args and opts that is always :error tuple" do
+      assert Checks.always_error_tuple_check() == %Spek.Literal{
+               result: {:error, :bad},
+               satisfied?: false
+             }
+
+      assert Checks.always_error_tuple?() == false
+      assert Checks.always_error_tuple() == {:error, :bad}
+    end
+
     test "can be called without arguments" do
       assert Checks.charging_check() == %Check{
                args: [:ctx],
                fun: :charging,
                module: Spek.MacrosTest.Checks
              }
+    end
+
+    test "supports function that returns :ok/:error atom" do
+      assert Checks.rich_atom_check() == %Check{
+               args: [:ctx],
+               fun: :rich_atom,
+               module: Spek.MacrosTest.Checks
+             }
+
+      assert Checks.rich_atom?(%{balance: 100_000}) == true
+      assert Checks.rich_atom?(%{balance: 10_000}) == false
+
+      assert Checks.rich_atom(%{balance: 100_000}) == :ok
+      assert Checks.rich_atom(%{balance: 10_000}) == :error
+    end
+
+    test "supports function that returns :ok/:error tuple" do
+      assert Checks.rich_tuple_check() == %Check{
+               args: [:ctx],
+               fun: :rich_tuple,
+               module: Spek.MacrosTest.Checks
+             }
+
+      assert Checks.rich_tuple?(%{balance: 100_000}) == true
+      assert Checks.rich_tuple?(%{balance: 10_000}) == false
+
+      assert Checks.rich_tuple(%{balance: 100_000}) == {:ok, :rich}
+      assert Checks.rich_tuple(%{balance: 10_000}) == {:error, :not_rich}
     end
   end
 end
