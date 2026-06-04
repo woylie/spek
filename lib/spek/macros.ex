@@ -72,21 +72,25 @@ defmodule Spek.Macros do
 
   - `{name}?` - A predicate function that returns the result of the boolean
     expression defined in the do-block.
-  - `{name}` - A function that runs the boolean expression defined in the
-    do-block and returns `:ok` or `{:error, term}`.
+  - `{name}` - A function that runs the expression defined in the
+    do-block and returns `:ok`, `:error`, `{:ok, term}`, or `{:error, term}`.
   - `{name}_check` - A function that returns a `Spek.Check` struct.
 
   ## Options
 
   - `:args` - The list of arguments as used in the `Spek.Check` struct.
     Defaults to `[:ctx]`.
-  - `:reason` - The reason used in the error tuple. Defaults to `:failed`.
+  - `:reason` - The reason used in the error tuple. Defaults to `:failed`. This
+    value is only used if the do-block returns a boolean.
 
   ## Do-block
 
-  The do-block is required to evaluate to a boolean value.
+  The do-block is required to return a boolean, `:ok`, `:error`, `{:ok, term}`,
+  or `{:error, term}`.
 
   ## Example
+
+  ### With boolean expression
 
   This macro call:
 
@@ -99,7 +103,6 @@ defmodule Spek.Macros do
                  ) do
           account.balance >= 0
         end
-
       end
 
   Will result in these three functions:
@@ -116,6 +119,17 @@ defmodule Spek.Macros do
 
       def account_balanced_check(args \\\\ [:ctx]) do
         %Check{module: MyApp.MyModule, fun: :account_balanced, args: args}
+      end
+
+  Alternatively, you can return :ok/:error values in the do-block with the same
+  result:
+
+      defmodule MyApp.MyModule do
+        import Spek.Macros
+        
+        defcheck account_balanced(account, args: [:ctx]) do
+          if account.balance >= 0, do: :ok, else: {:error, :account_unbalanced}
+        end
       end
 
   The `account_balanced?/1` and `account_balanced/1` functions can be used
@@ -208,12 +222,30 @@ defmodule Spek.Macros do
         quote(do: term())
       end
 
-    case body do
-      true ->
+    always_true? =
+      case body do
+        true -> true
+        :ok -> true
+        {:ok, _} -> true
+        _ -> false
+      end
+
+    always_false? =
+      case body do
+        false -> true
+        :error -> true
+        {:error, _} -> true
+        _ -> false
+      end
+
+    cond do
+      always_true? ->
+        ok_value = if is_boolean(body), do: :ok, else: body
+
         quote do
           @spec unquote(check_fun_name)(Spek.context()) :: Spek.Literal.t()
           def unquote(check_fun_name)(args \\ unquote(check_args)) do
-            %Spek.Literal{result: true, satisfied?: true}
+            %Spek.Literal{result: unquote(body), satisfied?: true}
           end
 
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) :: true
@@ -223,15 +255,17 @@ defmodule Spek.Macros do
 
           @spec unquote(name)(unquote_splicing(arg_types)) :: :ok
           def unquote(name)(unquote_splicing(call_args)) do
-            :ok
+            unquote(ok_value)
           end
         end
 
-      false ->
+      always_false? ->
+        error_value = if is_boolean(body), do: {:error, reason}, else: body
+
         quote do
           @spec unquote(check_fun_name)(Spek.context()) :: Spek.Literal.t()
           def unquote(check_fun_name)(args \\ unquote(check_args)) do
-            %Spek.Literal{result: false, satisfied?: false}
+            %Spek.Literal{result: unquote(body), satisfied?: false}
           end
 
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
@@ -243,12 +277,12 @@ defmodule Spek.Macros do
           @spec unquote(name)(unquote_splicing(arg_types)) ::
                   {:error, unquote(reason)}
           def unquote(name)(unquote_splicing(call_args)) do
-            {:error, unquote(reason)}
+            unquote(error_value)
           end
         end
 
-      _ ->
-        quote do
+      true ->
+        quote generated: true do
           @spec unquote(check_fun_name)(Spek.context()) :: Spek.Check.t()
           def unquote(check_fun_name)(args \\ unquote(check_args)) do
             %Spek.Check{
@@ -261,15 +295,20 @@ defmodule Spek.Macros do
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
                   boolean()
           def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
-            unquote(body)
+            Spek.to_boolean(unquote(name)(unquote_splicing(call_args)))
           end
 
           @spec unquote(name)(unquote_splicing(arg_types)) ::
                   :ok | {:error, unquote(reason)}
           def unquote(name)(unquote_splicing(call_args)) do
-            if unquote(predicate_fun_name)(unquote_splicing(call_args)),
-              do: :ok,
-              else: {:error, unquote(reason)}
+            case unquote(body) do
+              true -> :ok
+              false -> {:error, unquote(reason)}
+              :ok -> :ok
+              :error -> :error
+              {:ok, _} = result -> result
+              {:error, _} = result -> result
+            end
           end
         end
     end
