@@ -309,8 +309,7 @@ defmodule Spek.Macros do
             )
           end
 
-          @spec unquote(name)(unquote_splicing(arg_types)) ::
-                  :ok | {:error, unquote(reason)}
+          @spec unquote(name)(unquote_splicing(arg_types)) :: Spek.result()
           def unquote(name)(unquote_splicing(call_args)) do
             case unquote(body) do
               true -> :ok
