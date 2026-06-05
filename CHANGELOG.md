@@ -2,10 +2,17 @@
 
 ## Unreleased
 
+## [0.3.0] - 2026-06-05
+
 ### Changed
 
 - Support returning `:ok`, `:error`, `{:ok, term}`, or `{:error, term}` in
   `Spek.Macros.defcheck/2` body.
+
+### Fixed
+
+- Handle `defcheck` calls with multiple arguments without options.
+- Handle default arguments in `defcheck`.
 
 ## [0.2.0] - 2026-05-20
 
