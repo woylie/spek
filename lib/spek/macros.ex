@@ -205,7 +205,10 @@ defmodule Spek.Macros do
           {call_args, []}
 
         raw_args when is_list(raw_args) ->
-          Enum.split(raw_args, length(raw_args) - 1)
+          case Enum.split(raw_args, length(raw_args) - 1) do
+            {args, [list] = last_arg} when is_list(list) -> {args, last_arg}
+            _ -> {raw_args, []}
+          end
       end
 
     call_args = List.wrap(call_args)

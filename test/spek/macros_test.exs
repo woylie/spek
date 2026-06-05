@@ -36,6 +36,10 @@ defmodule Spek.MacrosTest do
       device.charging?
     end
 
+    defcheck two_args_no_opts(one, two) do
+      one == two
+    end
+
     defcheck always_true() do
       true
     end
@@ -226,6 +230,11 @@ defmodule Spek.MacrosTest do
 
       assert Checks.rich_tuple(%{balance: 100_000}) == {:ok, :rich}
       assert Checks.rich_tuple(%{balance: 10_000}) == {:error, :not_rich}
+    end
+
+    test "handles multiple arguments without options" do
+      assert Checks.two_args_no_opts(1, 1) == :ok
+      assert Checks.two_args_no_opts(1, 2) == {:error, :failed}
     end
   end
 end
