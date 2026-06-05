@@ -225,6 +225,12 @@ defmodule Spek.Macros do
         quote(do: term())
       end
 
+    call_args_without_defaults =
+      Enum.map(call_args, fn
+        {:\\, _, [arg, _]} -> arg
+        arg -> arg
+      end)
+
     always_true? =
       case body do
         true -> true
@@ -298,7 +304,9 @@ defmodule Spek.Macros do
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
                   boolean()
           def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
-            Spek.to_boolean(unquote(name)(unquote_splicing(call_args)))
+            Spek.to_boolean(
+              unquote(name)(unquote_splicing(call_args_without_defaults))
+            )
           end
 
           @spec unquote(name)(unquote_splicing(arg_types)) ::

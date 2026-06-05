@@ -63,6 +63,10 @@ defmodule Spek.MacrosTest do
     defcheck always_error_tuple do
       {:error, :bad}
     end
+
+    defcheck with_default_arg(one, two \\ 2) do
+      one < two
+    end
   end
 
   describe "build_check/2" do
@@ -235,6 +239,14 @@ defmodule Spek.MacrosTest do
     test "handles multiple arguments without options" do
       assert Checks.two_args_no_opts(1, 1) == :ok
       assert Checks.two_args_no_opts(1, 2) == {:error, :failed}
+    end
+
+    test "handles default arguments" do
+      refute Checks.with_default_arg?(1, 1)
+      assert Checks.with_default_arg?(1, 2)
+      assert Checks.with_default_arg?(1, 3)
+      assert Checks.with_default_arg?(1)
+      refute Checks.with_default_arg?(3)
     end
   end
 end
