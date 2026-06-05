@@ -205,7 +205,10 @@ defmodule Spek.Macros do
           {call_args, []}
 
         raw_args when is_list(raw_args) ->
-          Enum.split(raw_args, length(raw_args) - 1)
+          case Enum.split(raw_args, length(raw_args) - 1) do
+            {args, [list] = last_arg} when is_list(list) -> {args, last_arg}
+            _ -> {raw_args, []}
+          end
       end
 
     call_args = List.wrap(call_args)
@@ -221,6 +224,12 @@ defmodule Spek.Macros do
       for _ <- call_args do
         quote(do: term())
       end
+
+    call_args_without_defaults =
+      Enum.map(call_args, fn
+        {:\\, _, [arg, _]} -> arg
+        arg -> arg
+      end)
 
     always_true? =
       case body do
@@ -295,7 +304,9 @@ defmodule Spek.Macros do
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
                   boolean()
           def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
-            Spek.to_boolean(unquote(name)(unquote_splicing(call_args)))
+            Spek.to_boolean(
+              unquote(name)(unquote_splicing(call_args_without_defaults))
+            )
           end
 
           @spec unquote(name)(unquote_splicing(arg_types)) ::
