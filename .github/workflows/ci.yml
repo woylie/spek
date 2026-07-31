@@ -4,6 +4,9 @@ env:
   ELIXIR_VERSION: "1.20"
   OTP_VERSION: "29"
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -16,8 +19,6 @@ jobs:
   tests_coverage:
     runs-on: ubuntu-24.04
     name: Test Coverage
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
@@ -40,6 +41,8 @@ jobs:
           mix deps.get
       - name: Run Tests
         run: mix coveralls.github --warnings-as-errors
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   tests:
     runs-on: ubuntu-24.04
@@ -62,8 +65,6 @@ jobs:
           - { elixir: "1.20", otp: 27 }
           - { elixir: "1.20", otp: 28 }
           - { elixir: "1.20", otp: 29 }
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -106,8 +107,6 @@ jobs:
   code-quality:
     runs-on: ubuntu-24.04
     name: Code Quality
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
