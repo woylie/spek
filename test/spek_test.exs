@@ -1395,6 +1395,40 @@ defmodule SpekTest do
                ]
              }) == %Check{module: Checks, fun: :check1, args: []}
     end
+
+    test "A and (not A) = false" do
+      check = %Check{module: Checks, fun: :check1, args: []}
+      other = %Check{module: Checks, fun: :check2, args: []}
+
+      assert Spek.optimize(%AllOf{
+               children: [check, %Not{expression: check}]
+             }) == %Literal{satisfied?: false, result: false}
+
+      assert Spek.optimize(%AllOf{
+               children: [%Not{expression: check}, check]
+             }) == %Literal{satisfied?: false, result: false}
+
+      assert Spek.optimize(%AllOf{
+               children: [check, other, %Not{expression: check}]
+             }) == %Literal{satisfied?: false, result: false}
+    end
+
+    test "A or (not A) = true" do
+      check = %Check{module: Checks, fun: :check1, args: []}
+      other = %Check{module: Checks, fun: :check2, args: []}
+
+      assert Spek.optimize(%AnyOf{
+               children: [check, %Not{expression: check}]
+             }) == %Literal{satisfied?: true, result: true}
+
+      assert Spek.optimize(%AnyOf{
+               children: [%Not{expression: check}, check]
+             }) == %Literal{satisfied?: true, result: true}
+
+      assert Spek.optimize(%AnyOf{
+               children: [check, other, %Not{expression: check}]
+             }) == %Literal{satisfied?: true, result: true}
+    end
   end
 
   describe "collect_results/1" do
