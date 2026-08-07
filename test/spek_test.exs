@@ -184,6 +184,30 @@ defmodule SpekTest do
                }) == expected
       end
     end
+
+    test "raises if a check returns an invalid value" do
+      assert_raise ArgumentError, ~r/Spek\.Checks\.return_arg/, fn ->
+        Spek.eval?(%Check{module: Checks, fun: :return_arg, args: [nil]})
+      end
+    end
+
+    test "raises if {:ctx, key} is used with an invalid context" do
+      assert_raise ArgumentError, ~r/cannot resolve check argument/, fn ->
+        Spek.eval?(
+          %Check{module: Checks, fun: :from_bool, args: [{:ctx, :result}]},
+          "not a map"
+        )
+      end
+    end
+
+    test "raises if the key of {:ctx, key} is not an atom" do
+      assert_raise ArgumentError, ~r/cannot resolve check argument/, fn ->
+        Spek.eval?(
+          %Check{module: Checks, fun: :from_bool, args: [{:ctx, "result"}]},
+          %{result: true}
+        )
+      end
+    end
   end
 
   describe "eval_tree/2" do
@@ -734,6 +758,16 @@ defmodule SpekTest do
                ],
                satisfied?: false
              }
+    end
+
+    test "raises if a check returns an invalid value" do
+      assert_raise ArgumentError, ~r/Spek\.Checks\.return_arg/, fn ->
+        Spek.eval_tree_all(%AllOf{
+          children: [
+            %Check{module: Checks, fun: :return_arg, args: [nil]}
+          ]
+        })
+      end
     end
 
     test "does not stop early with AnyOf" do

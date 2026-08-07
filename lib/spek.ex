@@ -182,6 +182,9 @@ defmodule Spek do
 
   @typedoc """
   The evaluation context as passed to the evaluation functions.
+
+  If a check uses a `{:ctx, key}` argument, the context must be a map or a
+  keyword list containing that key.
   """
   @type context :: term
 
@@ -534,7 +537,7 @@ defmodule Spek do
       ) do
     module
     |> apply(fun, replace_args(args, context))
-    |> Spek.to_boolean()
+    |> check_result_to_boolean!(module, fun)
   end
 
   def eval?(%Not{expression: expression}, context) do
@@ -856,7 +859,12 @@ defmodule Spek do
          _
        ) do
     result = apply(module, fun, replace_args(args, context))
-    %{check | result: result, satisfied?: Spek.to_boolean(result)}
+
+    %{
+      check
+      | result: result,
+        satisfied?: check_result_to_boolean!(result, module, fun)
+    }
   end
 
   defp do_eval_tree(
@@ -937,8 +945,26 @@ defmodule Spek do
     Map.fetch!(context, key)
   end
 
-  defp replace_arg({:ctx, key}, context) when is_list(context) do
+  defp replace_arg({:ctx, key}, context)
+       when is_atom(key) and is_list(context) do
     Keyword.fetch!(context, key)
+  end
+
+  defp replace_arg({:ctx, key}, context) do
+    raise ArgumentError, """
+    invalid check argument
+
+    Cannot cannot resolve check argument. Expected the key to be an atom and
+    and the context to be a map or a keyword list.
+
+    Got key:
+
+        #{inspect(key)}
+
+    Got context:
+
+        #{inspect(context)}
+    """
   end
 
   defp replace_arg(arg, _), do: arg
@@ -1604,6 +1630,16 @@ defmodule Spek do
       ...>   }
       iex> Spek.collect_results(expression)
       ["a", "b", "c"]
+
+  Tagged results within `Not` expressions are collected as well.
+
+      iex> Spek.collect_results(
+      ...>   %Not{
+      ...>     satisfied?: true,
+      ...>     expression: %Literal{result: {:error, "bad"}, satisfied?: false}
+      ...>   }
+      ...> )
+      ["bad"]
   """
   @doc type: :evaluation
   @spec collect_results(expression) :: [term]
@@ -1742,4 +1778,62 @@ defmodule Spek do
   def to_boolean({:ok, _}), do: true
   def to_boolean(:error), do: false
   def to_boolean({:error, _}), do: false
+
+  def to_boolean(other) do
+    raise ArgumentError, """
+    invalid check result
+
+    Expected one of:
+
+        - true
+        - false
+        - :ok
+        - :error
+        - {:ok, term}
+        - {:error, term}
+
+    Got:
+
+        #{inspect(other)}
+    """
+  end
+
+  defp check_result_to_boolean!(result, module, fun) do
+    case result do
+      bool when is_boolean(bool) ->
+        bool
+
+      :ok ->
+        true
+
+      {:ok, _} ->
+        true
+
+      :error ->
+        false
+
+      {:error, _} ->
+        false
+
+      other ->
+        raise ArgumentError, """
+        invalid check function result
+
+        The function #{inspect(module)}.#{fun} returned an invalid value.
+
+        Expected one of:
+
+            - true
+            - false
+            - :ok
+            - :error
+            - {:ok, term}
+            - {:error, term}
+
+        Got:
+
+            #{inspect(other)}
+        """
+    end
+  end
 end
