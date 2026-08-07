@@ -1590,7 +1590,9 @@ defmodule Spek do
   defp do_collect_results(%Literal{result: {:error, v}}), do: [v]
   defp do_collect_results(%Literal{}), do: []
 
-  defp do_collect_results(%Not{}), do: []
+  defp do_collect_results(%Not{expression: expression}) do
+    do_collect_results(expression)
+  end
 
   defp do_collect_results(%AllOf{children: children}) do
     Enum.map(children, &do_collect_results/1)
