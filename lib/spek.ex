@@ -1200,6 +1200,8 @@ defmodule Spek do
   | Single-child disjunction elimination | `anyof(A) = A` |
   | Deduplication (AND) | `A and A = A` |
   | Deduplication (OR) | `A or A = A` |
+  | Complement (AND) | `A and (not A) = false` |
+  | Complement (OR) | `A or (not A) = true` |
   | Factoring OR over AND | `(A and B) or (A and C) = A and (B or C)` |
   | Factoring AND over OR | `(A or B) and (A or C) = A or (B and C)` |
   | Absorption (OR) | `A or (A and B) = A` |
@@ -1301,6 +1303,10 @@ defmodule Spek do
           literal_true?(child) ->
             {:cont, {acc, seen}}
 
+          # allof(A, not A) = false
+          complement_seen?(child, seen) ->
+            {:halt, {false, nil}}
+
           # allof(A, B, A) = allof(A, B) => skip duplicates
           MapSet.member?(seen, child) ->
             {:cont, {acc, seen}}
@@ -1351,6 +1357,10 @@ defmodule Spek do
             literal_false?(child) ->
               {:cont, {acc, seen}}
 
+            # anyof(A, not A) = true
+            complement_seen?(child, seen) ->
+              {:halt, {true, nil}}
+
             # anyOf(A, B, A) = anyof(A, B) => skip duplicates
             MapSet.member?(seen, child) ->
               {:cont, {acc, seen}}
@@ -1386,6 +1396,14 @@ defmodule Spek do
 
   defp literal_true?(%Literal{satisfied?: true}), do: true
   defp literal_true?(_), do: false
+
+  defp complement_seen?(%Not{expression: expression}, seen) do
+    MapSet.member?(seen, expression)
+  end
+
+  defp complement_seen?(expression, seen) do
+    MapSet.member?(seen, %Not{expression: expression})
+  end
 
   defp literal_false?(%Literal{satisfied?: false}), do: true
   defp literal_false?(_), do: false
