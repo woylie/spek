@@ -1630,6 +1630,16 @@ defmodule Spek do
       ...>   }
       iex> Spek.collect_results(expression)
       ["a", "b", "c"]
+
+  Tagged results within `Not` expressions are collected as well.
+
+      iex> Spek.collect_results(
+      ...>   %Not{
+      ...>     satisfied?: true,
+      ...>     expression: %Literal{result: {:error, "bad"}, satisfied?: false}
+      ...>   }
+      ...> )
+      ["bad"]
   """
   @doc type: :evaluation
   @spec collect_results(expression) :: [term]
