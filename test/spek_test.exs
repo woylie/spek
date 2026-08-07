@@ -1437,8 +1437,11 @@ defmodule SpekTest do
       end
     end
 
-    test "handles Not" do
-      assert Spek.collect_results(%Not{satisfied?: true}) == []
+    test "collects results within Not" do
+      assert Spek.collect_results(%Not{
+               satisfied?: true,
+               expression: %Literal{result: {:error, "bad"}, satisfied?: false}
+             }) == ["bad"]
     end
 
     test "returns results of an AllOf" do
