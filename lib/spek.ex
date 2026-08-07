@@ -182,6 +182,9 @@ defmodule Spek do
 
   @typedoc """
   The evaluation context as passed to the evaluation functions.
+
+  If a check uses a `{:ctx, key}` argument, the context must be a map or a
+  keyword list containing that key.
   """
   @type context :: term
 
@@ -942,8 +945,26 @@ defmodule Spek do
     Map.fetch!(context, key)
   end
 
-  defp replace_arg({:ctx, key}, context) when is_list(context) do
+  defp replace_arg({:ctx, key}, context)
+       when is_atom(key) and is_list(context) do
     Keyword.fetch!(context, key)
+  end
+
+  defp replace_arg({:ctx, key}, context) do
+    raise ArgumentError, """
+    invalid check argument
+
+    Cannot cannot resolve check argument. Expected the key to be an atom and
+    and the context to be a map or a keyword list.
+
+    Got key:
+
+        #{inspect(key)}
+
+    Got context:
+
+        #{inspect(context)}
+    """
   end
 
   defp replace_arg(arg, _), do: arg
