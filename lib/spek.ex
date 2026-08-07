@@ -534,7 +534,7 @@ defmodule Spek do
       ) do
     module
     |> apply(fun, replace_args(args, context))
-    |> Spek.to_boolean()
+    |> check_result_to_boolean!(module, fun)
   end
 
   def eval?(%Not{expression: expression}, context) do
@@ -856,7 +856,12 @@ defmodule Spek do
          _
        ) do
     result = apply(module, fun, replace_args(args, context))
-    %{check | result: result, satisfied?: Spek.to_boolean(result)}
+
+    %{
+      check
+      | result: result,
+        satisfied?: check_result_to_boolean!(result, module, fun)
+    }
   end
 
   defp do_eval_tree(
@@ -1742,4 +1747,62 @@ defmodule Spek do
   def to_boolean({:ok, _}), do: true
   def to_boolean(:error), do: false
   def to_boolean({:error, _}), do: false
+
+  def to_boolean(other) do
+    raise ArgumentError, """
+    invalid check result
+
+    Expected one of:
+
+        - true
+        - false
+        - :ok
+        - :error
+        - {:ok, term}
+        - {:error, term}
+
+    Got:
+
+        #{inspect(other)}
+    """
+  end
+
+  defp check_result_to_boolean!(result, module, fun) do
+    case result do
+      bool when is_boolean(bool) ->
+        bool
+
+      :ok ->
+        true
+
+      {:ok, _} ->
+        true
+
+      :error ->
+        false
+
+      {:error, _} ->
+        false
+
+      other ->
+        raise ArgumentError, """
+        invalid check function result
+
+        The function #{inspect(module)}.#{fun} returned an invalid value.
+
+        Expected one of:
+
+            - true
+            - false
+            - :ok
+            - :error
+            - {:ok, term}
+            - {:error, term}
+
+        Got:
+
+            #{inspect(other)}
+        """
+    end
+  end
 end
