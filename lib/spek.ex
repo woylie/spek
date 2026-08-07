@@ -1144,6 +1144,8 @@ defmodule Spek do
   @doc """
   Performs boolean algebra transformations on the given expression.
 
+  The transformations are applied repeatedly until no further optimization
+  applies.
   ## Examples
 
       iex> Spek.optimize(%AnyOf{
@@ -1205,16 +1207,23 @@ defmodule Spek do
   """
   @doc type: :optimization
   @spec optimize(expression) :: expression
-  def optimize(%Literal{} = literal) do
+  def optimize(expression) do
+    case optimize_pass(expression) do
+      ^expression -> expression
+      optimized -> optimize(optimized)
+    end
+  end
+
+  defp optimize_pass(%Literal{} = literal) do
     literal
   end
 
-  def optimize(%Check{} = check) do
+  defp optimize_pass(%Check{} = check) do
     check
   end
 
-  def optimize(%Not{expression: expression}) do
-    case optimize(expression) do
+  defp optimize_pass(%Not{expression: expression}) do
+    case optimize_pass(expression) do
       # not(not(expr)) == expr
       %Not{expression: expr} ->
         expr
@@ -1225,11 +1234,15 @@ defmodule Spek do
 
       # not (A and B) = (not A) or (not B)
       %AllOf{children: children} ->
-        %AnyOf{children: Enum.map(children, &optimize(%Not{expression: &1}))}
+        %AnyOf{
+          children: Enum.map(children, &optimize_pass(%Not{expression: &1}))
+        }
 
       # not (A or B) = (not A) and (not B)
       %AnyOf{children: children} ->
-        %AllOf{children: Enum.map(children, &optimize(%Not{expression: &1}))}
+        %AllOf{
+          children: Enum.map(children, &optimize_pass(%Not{expression: &1}))
+        }
 
       # otherwise, not(expr)
       expr ->
@@ -1237,39 +1250,39 @@ defmodule Spek do
     end
   end
 
-  def optimize(%AllOf{children: []}) do
+  defp optimize_pass(%AllOf{children: []}) do
     %Literal{satisfied?: true, result: true}
   end
 
-  def optimize(%AllOf{children: [child]}) do
-    optimize(child)
+  defp optimize_pass(%AllOf{children: [child]}) do
+    optimize_pass(child)
   end
 
-  def optimize(%AllOf{children: [_ | _]} = all_of) do
+  defp optimize_pass(%AllOf{children: [_ | _]} = all_of) do
     case factorize(all_of) do
       %AllOf{} = all_of ->
         do_optimize_all_of(all_of)
 
       %AnyOf{} = any_of ->
-        optimize(any_of)
+        optimize_pass(any_of)
     end
   end
 
-  def optimize(%AnyOf{children: []}) do
+  defp optimize_pass(%AnyOf{children: []}) do
     %Literal{satisfied?: false, result: false}
   end
 
-  def optimize(%AnyOf{children: [child]}) do
-    optimize(child)
+  defp optimize_pass(%AnyOf{children: [child]}) do
+    optimize_pass(child)
   end
 
-  def optimize(%AnyOf{children: [_ | _]} = any_of) do
+  defp optimize_pass(%AnyOf{children: [_ | _]} = any_of) do
     case factorize(any_of) do
       %AnyOf{} = any_of ->
         do_optimize_any_of(any_of)
 
       %AllOf{} = all_of ->
-        optimize(all_of)
+        optimize_pass(all_of)
     end
   end
 
@@ -1277,7 +1290,7 @@ defmodule Spek do
   defp do_optimize_all_of(%AllOf{children: [_ | _] = children}) do
     {children, _} =
       Enum.reduce_while(children, {[], MapSet.new()}, fn child, {acc, seen} ->
-        child = optimize(child)
+        child = optimize_pass(child)
 
         cond do
           # allof(A, false) = false
@@ -1327,7 +1340,7 @@ defmodule Spek do
         children,
         {[], MapSet.new()},
         fn child, {acc, seen} ->
-          child = optimize(child)
+          child = optimize_pass(child)
 
           cond do
             # anyof(A, true) = true
