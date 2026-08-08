@@ -4,7 +4,7 @@ defmodule Spek.Check do
   """
 
   @typedoc """
-  Representation of a single policy check.
+  Representation of a single check.
 
   - `module`, `fun`, `args` - Module, function, and arguments for the check
     function to run. To reference a key in the context argument passed to the

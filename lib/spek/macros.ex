@@ -41,7 +41,7 @@ defmodule Spek.Macros do
       build_check(:active_user, [{:ctx, :user}])
 
   Compiles to:
-    
+
       def active_user_check(args \\\\ [{:ctx, :user}]) do
         %Check{module: MyApp.MyModule, fun: :active_user, args: args}
       end
@@ -78,8 +78,12 @@ defmodule Spek.Macros do
 
   ## Options
 
-  - `:args` - The list of arguments as used in the `Spek.Check` struct.
-    Defaults to `[:ctx]`.
+  - `:args` - The list of arguments as used in the `Spek.Check` struct. The
+    length of the list must match an arity of the check function. Defaults to
+    `[:ctx]` if the function can be called with one argument, or to `[]` if
+    the function can only be called without arguments. For any other arity,
+    the option is required. A mismatch between the option and the function
+    arity raises an `ArgumentError` at compile time.
   - `:reason` - The reason used in the error tuple. Defaults to `:failed`. This
     value is only used if the do-block returns a boolean.
 
@@ -96,7 +100,7 @@ defmodule Spek.Macros do
 
       defmodule MyApp.MyModule do
         import Spek.Macros
-        
+
         defcheck account_balanced(account,
                    args: [:ctx],
                    reason: :account_unbalanced
@@ -126,7 +130,7 @@ defmodule Spek.Macros do
 
       defmodule MyApp.MyModule do
         import Spek.Macros
-        
+
         defcheck account_balanced(account, args: [:ctx]) do
           if account.balance >= 0, do: :ok, else: {:error, :account_unbalanced}
         end
@@ -169,7 +173,7 @@ defmodule Spek.Macros do
       end
 
   Which is expanded to:
-      
+
       def matching_organization?(user, account) do
         user.organization_id == organization.id
       end

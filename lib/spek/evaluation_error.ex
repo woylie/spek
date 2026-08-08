@@ -6,10 +6,10 @@ defmodule Spek.EvaluationError do
   @default_message "rule evaluation failed"
 
   @typedoc """
-  Struct returned or raised if an authorization check fails.
+  Struct returned or raised if a rule evaluation fails.
 
-  `expression` contains the parts of the policy expression that were performed
-  and their results. Depending on the evaluation function used, this may be the
+  `expression` contains the parts of the expression that were evaluated and
+  their results. Depending on the evaluation function used, this may be the
   complete expression, or only the parts of it that were evaluated until a
   decision was made.
 

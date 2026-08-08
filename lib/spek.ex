@@ -308,7 +308,7 @@ defmodule Spek do
   end
 
   @doc """
-  Builds an expression that is always false. 
+  Builds an expression that is always false.
 
   ## Example
 
@@ -334,7 +334,7 @@ defmodule Spek do
 
       iex> literal(true)
       %Spek.Literal{result: true, satisfied?: true}
-      
+
       iex> literal(:ok)
       %Spek.Literal{result: :ok, satisfied?: true}
 
@@ -343,10 +343,10 @@ defmodule Spek do
 
       iex> literal(false)
       %Spek.Literal{result: false, satisfied?: false}
-      
+
       iex> literal(:error)
       %Spek.Literal{result: :error, satisfied?: false}
-      
+
       iex> literal({:error, :codec_not_supported})
       %Spek.Literal{result: {:error, :codec_not_supported}, satisfied?: false}
   """
@@ -439,16 +439,16 @@ defmodule Spek do
   end
 
   @doc """
-  Builds an expression that is always true. 
+  Builds an expression that is always true.
 
   ## Example
 
       iex> pass()
       %Spek.Literal{result: true, satisfied?: true}
-      
+
       iex> pass(:ok)
       %Spek.Literal{result: :ok, satisfied?: true}
-      
+
       iex> pass({:ok, "proxy_stream_ready"})
       %Spek.Literal{result: {:ok, "proxy_stream_ready"}, satisfied?: true}
   """
@@ -954,8 +954,8 @@ defmodule Spek do
     raise ArgumentError, """
     invalid check argument
 
-    Cannot cannot resolve check argument. Expected the key to be an atom and
-    and the context to be a map or a keyword list.
+    Cannot resolve check argument. Expected the key to be an atom and the
+    context to be a map or a keyword list.
 
     Got key:
 
@@ -1172,6 +1172,12 @@ defmodule Spek do
 
   The transformations are applied repeatedly until no further optimization
   applies.
+
+  Only the boolean outcome is preserved. Optimization may remove, deduplicate
+  and reorder checks, so check functions must be free of side effects, and the
+  results collected by `eval_collect/2` and the other collecting functions may
+  differ from the results of the unoptimized expression.
+
   ## Examples
 
       iex> Spek.optimize(%AnyOf{
@@ -1539,10 +1545,10 @@ defmodule Spek do
     }
 
     case other do
-      # if there were no none-AllOf expressions in the original AnyOf, just
+      # if there were no non-AllOf expressions in the original AnyOf, just
       # return the factorized AllOf expression
       [] -> new_all_of
-      # if there were none-Allof expressions in the original AnyOf, wrap the
+      # if there were non-AllOf expressions in the original AnyOf, wrap the
       # factorized AllOf expression and the remaining expressions in an AnyOf
       # (A and B) or (A and C) or D = (A and (B or C)) or D
       _ -> %AnyOf{children: [new_all_of | other]}
@@ -1571,10 +1577,10 @@ defmodule Spek do
     }
 
     case other do
-      # if there were no none-AnyOf expressions in the original AllOf, just
+      # if there were no non-AnyOf expressions in the original AllOf, just
       # return the factorized AnyOf expression
       [] -> new_any_of
-      # if there were none-AnyOf expressions in the original AllOf, wrap the
+      # if there were non-AnyOf expressions in the original AllOf, wrap the
       # factorized AnyOf expression and the remaining expressions in an AllOf
       # (A or B) and (A or C) and D = (A or (B and C)) and D
       _ -> %AllOf{children: [new_any_of | other]}
