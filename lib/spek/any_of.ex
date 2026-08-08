@@ -1,8 +1,9 @@
 defmodule Spek.AnyOf do
   @moduledoc """
-  Struct that represents a combination of checks one of which must be true.
+  Struct that represents a combination of expressions of which at least one must
+  be true.
 
-  An `Or` without children evaluates to `false`.
+  Without children, the expression evaluates to `false`.
   """
 
   @type t :: %__MODULE__{

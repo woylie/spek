@@ -1,6 +1,6 @@
 defmodule Spek.Literal do
   @moduledoc """
-  Struct that represents an authorization rule that evaluates to a fixed value.
+  Struct that represents an expression that evaluates to a fixed value.
   """
 
   @type t ::

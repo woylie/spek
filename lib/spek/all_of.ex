@@ -2,7 +2,7 @@ defmodule Spek.AllOf do
   @moduledoc """
   Struct that represents a combination of expressions that all must be true.
 
-  An `And` without children evaluates to `true`.
+  Without children, the expression evaluates to `true`.
   """
 
   @type t :: %__MODULE__{

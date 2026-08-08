@@ -9,19 +9,19 @@ expressions.
 
 ## Features
 
-- Expression structs and builder functions for boolean logic: `AllOf`, `AnyOf`,
-  `Not`, `Literal`, `Check`.
+- Expression structs and builder functions for boolean logic: `Spek.AllOf`,
+  `Spek.AnyOf`, `Spek.Not`, `Spek.Literal`, `Spek.Check`.
 - Evaluation of boolean expressions with optional early stopping and optional
   evaluation tree output.
 - Optimization of boolean expressions using boolean algebra:
   - Identity
   - Annihilation
-  - Idempotence
+  - Complement
   - Double negation
   - De Morgan transformations
+  - Deduplication
   - Absorption
   - Factorization
-  - Deduplication
   - Constant folding
 - Macros for concisely defining reusable check functions.
 
@@ -44,6 +44,10 @@ def deps do
   ]
 end
 ```
+
+Spek is tested against the Elixir versions that are currently supported
+upstream. Older versions down to the requirement in `mix.exs` are likely to
+work, but they are not covered by CI and not officially supported.
 
 ## Expressions
 
@@ -653,9 +657,9 @@ checks. The return value of the `deliver_final_master` function is:
 }
 ```
 
-Note that both the `proxy_media_available?` check and the `legal_clearance_completed?`
-check appear in multiple branches. The `optimize` function will factor out
-these common checks.
+Note that both the `proxy_media_available` check and the
+`legal_clearance_completed` check appear in multiple branches. The `optimize`
+function will factor out these common checks.
 
 ```elixir
 # Rules.deliver_final_master() |> Spek.optimize()
@@ -748,7 +752,11 @@ value known at compile time:
 defmodule Rules do
   import Spek
 
-  @auto_render_enabled Application.compile_env(:spek, :auto_render_enabled, true)
+  @auto_render_enabled Application.compile_env(
+                         :my_app,
+                         :auto_render_enabled,
+                         true
+                       )
 
   @dailies_package_ready all_of([
                        check(Checks, :proxy_media_available),

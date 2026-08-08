@@ -192,7 +192,7 @@ defmodule SpekTest do
     end
 
     test "raises if {:ctx, key} is used with an invalid context" do
-      assert_raise ArgumentError, ~r/cannot resolve check argument/, fn ->
+      assert_raise ArgumentError, ~r/Cannot resolve check argument/, fn ->
         Spek.eval?(
           %Check{module: Checks, fun: :from_bool, args: [{:ctx, :result}]},
           "not a map"
@@ -201,7 +201,7 @@ defmodule SpekTest do
     end
 
     test "raises if the key of {:ctx, key} is not an atom" do
-      assert_raise ArgumentError, ~r/cannot resolve check argument/, fn ->
+      assert_raise ArgumentError, ~r/Cannot resolve check argument/, fn ->
         Spek.eval?(
           %Check{module: Checks, fun: :from_bool, args: [{:ctx, "result"}]},
           %{result: true}
@@ -1761,6 +1761,85 @@ defmodule SpekTest do
                "check bad",
                "nested literal good"
              ]
+    end
+
+    test "deduplicates results, keeping evaluation order" do
+      expression = %AllOf{
+        children: [
+          %Literal{result: {:error, "b"}, satisfied?: false},
+          %Literal{result: {:error, "a"}, satisfied?: false},
+          %Literal{result: {:error, "b"}, satisfied?: false}
+        ]
+      }
+
+      assert Spek.collect_results(expression) == ["b", "a"]
+      assert Spek.collect_results(expression, :error) == ["b", "a"]
+    end
+  end
+
+  describe "optimize/1 and collected results" do
+    setup do
+      a = Spek.check(Checks, :from_result_key, [{:ctx, :a}])
+      b = Spek.check(Checks, :from_result_key, [{:ctx, :b}])
+      c = Spek.check(Checks, :from_result_key, [{:ctx, :c}])
+
+      context = %{
+        a: %{result: {:error, :reason_a}},
+        b: %{result: {:error, :reason_b}},
+        c: %{result: {:error, :reason_c}}
+      }
+
+      %{a: a, b: b, c: c, context: context}
+    end
+
+    defp collected(expression, context) do
+      {:error, %EvaluationError{results: results}} =
+        Spek.eval_collect_all(expression, context)
+
+      results
+    end
+
+    test "deduplication preserves the results", %{a: a, context: context} do
+      expression = %AllOf{children: [a, a]}
+
+      assert collected(expression, context) ==
+               collected(Spek.optimize(expression), context)
+    end
+
+    test "factoring OR over AND preserves the results", ctx do
+      %{a: a, b: b, c: c, context: context} = ctx
+
+      expression =
+        Spek.any_of([Spek.all_of(a, b), Spek.all_of(a, c)])
+
+      assert collected(expression, context) ==
+               collected(Spek.optimize(expression), context)
+    end
+
+    test "factoring AND over OR preserves the results", ctx do
+      %{a: a, b: b, c: c, context: context} = ctx
+
+      expression =
+        Spek.all_of([Spek.any_of(a, b), Spek.any_of(a, c)])
+
+      assert collected(expression, context) ==
+               collected(Spek.optimize(expression), context)
+    end
+
+    test "absorption drops the results of the removed check", ctx do
+      %{a: a, b: b, context: context} = ctx
+
+      expression = Spek.any_of([a, Spek.all_of(a, b)])
+
+      assert collected(expression, context) == [:reason_a, :reason_b]
+      assert collected(Spek.optimize(expression), context) == [:reason_a]
+    end
+
+    test "the complement laws drop all results", %{a: a, context: context} do
+      expression = Spek.all_of([a, Spek.negate(a)])
+
+      assert collected(expression, context) == [:reason_a]
+      assert collected(Spek.optimize(expression), context) == []
     end
   end
 end

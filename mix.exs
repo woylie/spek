@@ -14,7 +14,15 @@ defmodule Spek.MixProject do
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
       dialyzer: [
-        plt_file: {:no_warn, ".plts/dialyzer.plt"}
+        plt_file: {:no_warn, ".plts/dialyzer.plt"},
+        flags: [
+          :error_handling,
+          :extra_return,
+          :missing_return,
+          :underspecs,
+          :unknown,
+          :unmatched_returns
+        ]
       ],
       aliases: aliases(),
       name: "Spek",
@@ -83,7 +91,7 @@ defmodule Spek.MixProject do
       source_ref: @version,
       skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
       groups_for_modules: [
-        structs: [Spek.AllOf, Spek.Check, Spek.Literal, Spek.Not, Spek.AnyOf]
+        Structs: [Spek.AllOf, Spek.AnyOf, Spek.Check, Spek.Literal, Spek.Not]
       ],
       groups_for_docs: [
         "Builder Functions": &(&1[:type] == :builder),
