@@ -7,6 +7,10 @@ env:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -19,8 +23,11 @@ jobs:
   tests_coverage:
     runs-on: ubuntu-24.04
     name: Test Coverage
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         id: beam
         with:
@@ -47,6 +54,7 @@ jobs:
   tests:
     runs-on: ubuntu-24.04
     name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
+    timeout-minutes: 10
     strategy:
       matrix:
         include:
@@ -68,6 +76,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         id: beam
         with:
@@ -93,23 +103,22 @@ jobs:
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     name: Tests
+    timeout-minutes: 5
     needs:
       - tests
     steps:
-      - run: |
-          result="${{ needs.tests.result }}"
-          if [[ $result == "success" ]]; then
-            exit 0
-          else
-            exit 1
-          fi
+      - if: ${{ needs.tests.result != 'success' }}
+        run: exit 1
 
   code-quality:
     runs-on: ubuntu-24.04
     name: Code Quality
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         id: beam
         with:
