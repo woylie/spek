@@ -1220,9 +1220,16 @@ defmodule Spek do
   Optimization may remove, deduplicate and reorder checks, so check functions
   must be free of side effects.
 
-  Absorption and the complement laws remove checks that cannot affect the
-  outcome, and the results of those checks are not collected by
-  `eval_collect/2` and the other collecting functions.
+  Some transformations remove a sub-expression whose result cannot change the
+  outcome, and the results of a removed sub-expression are not collected by
+  `eval_collect/2` and the other collecting functions. Given `A or (A and B)`,
+  a failing `A` makes the outcome independent of `B`, so the optimized
+  expression reports only the reason of `A`.
+
+  The identity, annihilation, absorption and complement laws remove
+  sub-expressions this way. Deduplication, factoring, De Morgan's laws, double
+  negation elimination and the negation of a literal rewrite the expression
+  without removing anything, and leave the collected results unchanged.
 
   ## Examples
 
@@ -1309,8 +1316,8 @@ defmodule Spek do
         expr
 
       # not(true) == false, not(false) == true
-      %Literal{satisfied?: bool} ->
-        %Literal{satisfied?: not bool, result: not bool}
+      %Literal{satisfied?: bool, result: result} ->
+        %Literal{satisfied?: not bool, result: negate_result(result)}
 
       # not (A and B) = (not A) or (not B)
       %AllOf{children: children} ->
@@ -1471,6 +1478,14 @@ defmodule Spek do
       children -> %AnyOf{children: Enum.reverse(children)}
     end
   end
+
+  # Negating a literal keeps its payload, so that the results collected from an
+  # optimized expression match those of the unoptimized one.
+  defp negate_result(bool) when is_boolean(bool), do: not bool
+  defp negate_result(:ok), do: :error
+  defp negate_result(:error), do: :ok
+  defp negate_result({:ok, value}), do: {:error, value}
+  defp negate_result({:error, value}), do: {:ok, value}
 
   defp literal_true?(%Literal{satisfied?: true}), do: true
   defp literal_true?(_), do: false
