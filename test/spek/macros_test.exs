@@ -67,6 +67,10 @@ defmodule Spek.MacrosTest do
     defcheck with_default_arg(one, two \\ 2) do
       one < two
     end
+
+    defcheck passes_result_through(value) do
+      value
+    end
   end
 
   describe "build_check/2" do
@@ -247,6 +251,22 @@ defmodule Spek.MacrosTest do
       assert Checks.with_default_arg?(1, 3)
       assert Checks.with_default_arg?(1)
       refute Checks.with_default_arg?(3)
+    end
+
+    test "raises the same error as a hand-written check for an invalid result" do
+      message = ~r/invalid check function result.*passes_result_through/s
+
+      assert_raise ArgumentError, message, fn ->
+        Checks.passes_result_through(nil)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        Checks.passes_result_through?(nil)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        Spek.eval?(Checks.passes_result_through_check(), nil)
+      end
     end
   end
 end
