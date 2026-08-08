@@ -3,11 +3,6 @@ defmodule Spek.OptimizeResultsTest do
 
   alias Spek.Checks
 
-  # `Spek.optimize/1` preserves the boolean outcome but not necessarily the
-  # collected results, and its documentation names which laws remove results
-  # and which do not. Both halves of that claim are asserted here, one law per
-  # case, so the documentation cannot drift away from the implementation.
-
   setup do
     a = Spek.check(Checks, :from_result_key, [{:ctx, :a}])
     b = Spek.check(Checks, :from_result_key, [{:ctx, :b}])

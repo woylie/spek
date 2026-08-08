@@ -222,6 +222,7 @@ defmodule Spek do
       }
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec all_of([expression]) :: AllOf.t()
   def all_of(children) when is_list(children) do
     %AllOf{children: children}
@@ -244,6 +245,7 @@ defmodule Spek do
       }
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec all_of(expression, expression) :: AllOf.t()
   def all_of(a, b) do
     %AllOf{children: [a, b]}
@@ -266,6 +268,7 @@ defmodule Spek do
       }
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec any_of([expression]) :: AnyOf.t()
   def any_of(children) when is_list(children) do
     %AnyOf{children: children}
@@ -288,6 +291,7 @@ defmodule Spek do
       }
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec any_of(expression, expression) :: AnyOf.t()
   def any_of(a, b) do
     %AnyOf{children: [a, b]}
@@ -302,6 +306,7 @@ defmodule Spek do
       %Spek.Check{module: WeatherChecks, fun: :temperature_below_freezing, args: [0]}
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec check(module, fun, Check.args()) :: Check.t()
   def check(module, fun, args \\ [:ctx]) do
     %Check{module: module, fun: fun, args: args}
@@ -311,8 +316,8 @@ defmodule Spek do
   Builds an expression that is always false.
 
   Raises an `ArgumentError` if the result is not `false`, `:error`, or an error
-  tuple. Use `pass/1` for a result that is true, or `literal/1` to derive the
-  outcome from the result.
+  tuple. Use `pass/1` for a truthy result, or `literal/1` to derive the outcome
+  from the result.
 
   ## Example
 
@@ -326,6 +331,7 @@ defmodule Spek do
       %Spek.Literal{result: {:error, :insufficient_lighting}, satisfied?: false}
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec fail(falsy) :: Literal.t()
   def fail(result \\ false) do
     if to_boolean(result) do
@@ -373,6 +379,7 @@ defmodule Spek do
       %Spek.Literal{result: {:error, :codec_not_supported}, satisfied?: false}
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec literal(result) :: Literal.t()
   def literal(result) do
     %Literal{result: result, satisfied?: to_boolean(result)}
@@ -394,6 +401,7 @@ defmodule Spek do
       }
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec nand(expression, expression) :: expression
   def nand(a, b) do
     negate(all_of(a, b))
@@ -413,6 +421,7 @@ defmodule Spek do
       }
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec negate(expression) :: Not.t()
   def negate(expression) do
     %Not{expression: expression}
@@ -434,6 +443,7 @@ defmodule Spek do
       }
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec none([expression]) :: expression
   def none(children) when is_list(children) do
     negate(any_of(children))
@@ -455,6 +465,7 @@ defmodule Spek do
       }
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec nor(expression, expression) :: expression
   def nor(a, b) do
     negate(any_of(a, b))
@@ -464,8 +475,8 @@ defmodule Spek do
   Builds an expression that is always true.
 
   Raises an `ArgumentError` if the result is not `true`, `:ok`, or an ok tuple.
-  Use `fail/1` for a result that is false, or `literal/1` to derive the outcome
-  from the result.
+  Use `fail/1` for a falsy result, or `literal/1` to derive the outcome from
+  the result.
 
   ## Example
 
@@ -479,6 +490,7 @@ defmodule Spek do
       %Spek.Literal{result: {:ok, "proxy_stream_ready"}, satisfied?: true}
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec pass(truthy) :: Literal.t()
   def pass(result \\ true) do
     if to_boolean(result) do
@@ -538,6 +550,7 @@ defmodule Spek do
       }
   """
   @doc type: :builder
+  @doc since: "0.1.0"
   @spec xor(expression, expression) :: expression
   def xor(a, b) do
     any_of([
@@ -568,6 +581,7 @@ defmodule Spek do
       false
   """
   @doc type: :evaluation
+  @doc since: "0.1.0"
   @spec eval?(expression, context) :: boolean
   def eval?(expr, context \\ [])
 
@@ -616,6 +630,7 @@ defmodule Spek do
       {:error, %Spek.EvaluationError{message: "rule evaluation failed"}}
   """
   @doc type: :evaluation
+  @doc since: "0.1.0"
   @spec eval(expression, context) :: :ok | {:error, EvaluationError.t()}
   def eval(expression, context \\ []) do
     if eval?(expression, context) do
@@ -645,6 +660,7 @@ defmodule Spek do
       ** (Spek.EvaluationError) rule evaluation failed
   """
   @doc type: :evaluation
+  @doc since: "0.1.0"
   @spec eval!(expression, context) :: :ok | no_return()
   def eval!(expression, context \\ []) do
     if eval?(expression, context) do
@@ -697,6 +713,7 @@ defmodule Spek do
       }
   """
   @doc type: :evaluation
+  @doc since: "0.1.0"
   @spec eval_tree(expression, context) ::
           {:ok, expression} | {:error, EvaluationError.t()}
   def eval_tree(expression, context \\ []) do
@@ -740,6 +757,7 @@ defmodule Spek do
       ** (Spek.EvaluationError) rule evaluation failed
   """
   @doc type: :evaluation
+  @doc since: "0.1.0"
   @spec eval_tree!(expression, context) :: expression | no_return
   def eval_tree!(expression, context \\ []) do
     case do_eval_tree(expression, context, :halt) do
@@ -824,6 +842,7 @@ defmodule Spek do
       }
   """
   @doc type: :evaluation
+  @doc since: "0.1.0"
   @spec eval_tree_all(expression, context) ::
           {:ok, expression} | {:error, EvaluationError.t()}
   def eval_tree_all(expression, context \\ []) do
@@ -882,6 +901,7 @@ defmodule Spek do
       ** (Spek.EvaluationError) rule evaluation failed
   """
   @doc type: :evaluation
+  @doc since: "0.1.0"
   @spec eval_tree_all!(expression, context) :: expression | no_return
   def eval_tree_all!(expression, context \\ []) do
     case do_eval_tree(expression, context, :cont) do
@@ -1051,6 +1071,7 @@ defmodule Spek do
       }
   """
   @doc type: :evaluation
+  @doc since: "0.2.0"
   @spec eval_collect(expression, context) ::
           {:ok, [term]} | {:error, EvaluationError.t()}
   def eval_collect(expression, context \\ []) do
@@ -1084,6 +1105,7 @@ defmodule Spek do
       ** (Spek.EvaluationError) rule evaluation failed
   """
   @doc type: :evaluation
+  @doc since: "0.2.0"
   @spec eval_collect!(expression, context) :: [term] | no_return
   def eval_collect!(expression, context \\ []) do
     case eval_tree(expression, context) do
@@ -1130,6 +1152,7 @@ defmodule Spek do
       }
   """
   @doc type: :evaluation
+  @doc since: "0.2.0"
   @spec eval_collect_all(expression, context) ::
           {:ok, [term]} | {:error, EvaluationError.t()}
   def eval_collect_all(expression, context \\ []) do
@@ -1163,6 +1186,7 @@ defmodule Spek do
       ** (Spek.EvaluationError) rule evaluation failed
   """
   @doc type: :evaluation
+  @doc since: "0.2.0"
   @spec eval_collect_all!(expression, context) :: [term] | no_return
   def eval_collect_all!(expression, context \\ []) do
     case eval_tree_all(expression, context) do
@@ -1186,6 +1210,7 @@ defmodule Spek do
       ["scene_042_render_complete"]
   """
   @doc type: :evaluation
+  @doc since: "0.1.0"
   @spec filter(Enumerable.t(), expression) :: Enumerable.t()
   def filter(items, expression) do
     Enum.filter(items, &eval?(expression, &1))
@@ -1204,6 +1229,7 @@ defmodule Spek do
       ["shot_017_proxy_ready"]
   """
   @doc type: :evaluation
+  @doc since: "0.1.0"
   @spec reject(Enumerable.t(), expression) :: Enumerable.t()
   def reject(items, expression) do
     Enum.reject(items, &eval?(expression, &1))
@@ -1221,10 +1247,10 @@ defmodule Spek do
   must be free of side effects.
 
   Some transformations remove a sub-expression whose result cannot change the
-  outcome, and the results of a removed sub-expression are not collected by
-  `eval_collect/2` and the other collecting functions. Given `A or (A and B)`,
-  a failing `A` makes the outcome independent of `B`, so the optimized
-  expression reports only the reason of `A`.
+  outcome, and `eval_collect/2` and the other collecting functions do not
+  return the results of what was removed. Given `A or (A and B)`, a failing `A`
+  makes the outcome independent of `B`, so the optimized expression returns the
+  result of `A` alone.
 
   The identity, annihilation, absorption and complement laws remove
   sub-expressions this way. Deduplication, factoring, De Morgan's laws, double
@@ -1293,6 +1319,7 @@ defmodule Spek do
   | Absorption (AND) | `A and (A or B) = A` |
   """
   @doc type: :optimization
+  @doc since: "0.1.0"
   @spec optimize(expression) :: expression
   def optimize(expression) do
     case optimize_pass(expression) do
@@ -1710,6 +1737,7 @@ defmodule Spek do
       ["bad"]
   """
   @doc type: :evaluation
+  @doc since: "0.2.0"
   @spec collect_results(expression) :: [term]
   def collect_results(expression) do
     expression
@@ -1816,6 +1844,7 @@ defmodule Spek do
       []
   """
   @doc type: :evaluation
+  @doc since: "0.2.0"
   @spec collect_results(expression, :ok | :error) :: [term]
   def collect_results(expression, only) when only in [:ok, :error] do
     expression
@@ -1847,10 +1876,10 @@ defmodule Spek do
   @doc """
   Converts a check result to a boolean.
 
-  This is the mapping the evaluation functions apply to the return value of a
-  check function, and the functions generated by `Spek.Macros.defcheck/2` use
-  it as well. You can use it when you write a check function by hand and need
-  the boolean outcome of a result.
+  The evaluation functions apply this mapping to whatever a check function
+  returns, and the functions generated by `Spek.Macros.defcheck/2` call it
+  directly. Use it when you write a check function by hand and need the boolean
+  outcome of a result.
 
   Raises an `ArgumentError` if the value is not a valid result.
 

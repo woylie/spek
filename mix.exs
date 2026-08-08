@@ -97,9 +97,6 @@ defmodule Spek.MixProject do
         "Builder Functions": &(&1[:type] == :builder),
         "Evaluation Functions": &(&1[:type] == :evaluation),
         "Optimization Functions": &(&1[:type] == :optimization)
-      ],
-      groups_for_extras: [
-        Cheatsheets: ~r/cheatsheets\/.?/
       ]
     ]
   end

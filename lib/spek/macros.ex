@@ -46,6 +46,7 @@ defmodule Spek.Macros do
         %Check{module: MyApp.MyModule, fun: :active_user, args: args}
       end
   """
+  @doc since: "0.1.0"
   defmacro build_check(fun, args \\ [:ctx]) do
     module = __CALLER__.module
     function_name = :"#{fun}_check"
@@ -218,6 +219,7 @@ defmodule Spek.Macros do
         organization: %Organization{id: 1}
       )
   """
+  @doc since: "0.1.0"
   defmacro defcheck({:when, _, [{name, _, raw_args}, guard]}, do: body) do
     expand_defcheck(name, raw_args, guard, body, __CALLER__.module)
   end
