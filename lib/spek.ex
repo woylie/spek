@@ -1173,10 +1173,12 @@ defmodule Spek do
   The transformations are applied repeatedly until no further optimization
   applies.
 
-  Only the boolean outcome is preserved. Optimization may remove, deduplicate
-  and reorder checks, so check functions must be free of side effects, and the
-  results collected by `eval_collect/2` and the other collecting functions may
-  differ from the results of the unoptimized expression.
+  Optimization may remove, deduplicate and reorder checks, so check functions
+  must be free of side effects.
+
+  Absorption and the complement laws remove checks that cannot affect the
+  outcome, and the results of those checks are not collected by
+  `eval_collect/2` and the other collecting functions.
 
   ## Examples
 
@@ -1590,7 +1592,8 @@ defmodule Spek do
   @doc """
   Collects all tagged results from an expression into a list.
 
-  Results are returned without their `:ok` / `:error` tags.
+  Results are returned without their `:ok` / `:error` tags, in evaluation order,
+  and are deduplicated.
 
   ## Examples
 
@@ -1653,6 +1656,7 @@ defmodule Spek do
     expression
     |> do_collect_results()
     |> List.flatten()
+    |> Enum.uniq()
   end
 
   defp do_collect_results(%Check{result: {:ok, v}}), do: [v]
@@ -1677,6 +1681,8 @@ defmodule Spek do
 
   @doc """
   Collects the success or error results of an expression into a list.
+
+  Results are returned in evaluation order and are deduplicated.
 
   ## Examples
 
@@ -1756,6 +1762,7 @@ defmodule Spek do
     expression
     |> do_collect_results(only == :ok)
     |> List.flatten()
+    |> Enum.uniq()
   end
 
   defp do_collect_results(%Check{result: {:ok, v}}, true), do: [v]
