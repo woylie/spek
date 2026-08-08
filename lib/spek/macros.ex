@@ -87,6 +87,15 @@ defmodule Spek.Macros do
   - `:reason` - The reason used in the error tuple. Defaults to `:failed`. This
     value is only used if the do-block returns a boolean.
 
+  The options are passed as the last argument of the check definition, and are
+  recognized by their shape, so a check without arguments takes options too.
+
+      defcheck maintenance_mode(reason: :under_maintenance) do
+        Application.get_env(:my_app, :maintenance_mode, false)
+      end
+
+  An unrecognized option raises an `ArgumentError` at compile time.
+
   ## Do-block
 
   The do-block is required to return a boolean, `:ok`, `:error`, `{:ok, term}`,
@@ -201,25 +210,49 @@ defmodule Spek.Macros do
   """
   # credo:disable-for-next-line
   defmacro defcheck({name, _, raw_args}, do: body) do
-    raw_args = raw_args || []
+    {call_args, opts} = split_call_args(raw_args || [])
+    validate_opts!(name, opts)
+    register_name!(__CALLER__.module, name)
 
-    {call_args, opts} =
-      case raw_args do
-        [call_args] ->
-          {call_args, []}
+    max_arity = length(call_args)
+    num_defaults = Enum.count(call_args, &match?({:\\, _, _}, &1))
+    min_arity = max_arity - num_defaults
 
-        raw_args when is_list(raw_args) ->
-          case Enum.split(raw_args, length(raw_args) - 1) do
-            {args, [list] = last_arg} when is_list(list) -> {args, last_arg}
-            _ -> {raw_args, []}
-          end
-      end
-
-    call_args = List.wrap(call_args)
-    opts = List.first(opts) || []
+    default_check_args =
+      if min_arity <= 1 and max_arity >= 1, do: [:ctx], else: []
 
     reason = Keyword.get(opts, :reason, :failed)
-    check_args = Keyword.get(opts, :args, [:ctx])
+    check_args = Keyword.get(opts, :args, default_check_args)
+
+    if not is_list(check_args) do
+      raise ArgumentError, """
+      invalid :args option in defcheck #{name}
+
+      Expected a list.
+
+      Got:
+
+          #{inspect(check_args)}
+      """
+    end
+
+    if length(check_args) not in min_arity..max_arity//1 do
+      arity_range =
+        if min_arity == max_arity,
+          do: "#{max_arity}",
+          else: "#{min_arity} to #{max_arity}"
+
+      raise ArgumentError, """
+      invalid :args option in defcheck #{name}
+
+      Expected #{arity_range} element(s), to match the arity of #{name}.
+
+      Got #{length(check_args)} element(s):
+
+          #{inspect(check_args)}
+      """
+    end
+
     module = __CALLER__.module
     check_fun_name = :"#{name}_check"
     predicate_fun_name = :"#{name}?"
@@ -343,6 +376,64 @@ defmodule Spek.Macros do
             end
           end
         end
+    end
+  end
+
+  @known_opts [:args, :reason]
+
+  defp split_call_args([]), do: {[], []}
+
+  defp split_call_args(args) do
+    last = List.last(args)
+
+    if last != [] and Keyword.keyword?(last) do
+      {Enum.drop(args, -1), last}
+    else
+      {args, []}
+    end
+  end
+
+  # defcheck emits a `{name}_check/1` with a default argument, and Elixir allows
+  # a default to be declared only once per function, so a check cannot be
+  # defined in multiple clauses.
+  defp register_name!(module, name) do
+    defined = Module.get_attribute(module, :spek_defcheck_names) || []
+
+    if name in defined do
+      raise ArgumentError, """
+      duplicate check definition
+
+      #{name} is already defined in this module, and a check cannot be split
+      into multiple clauses: the generated #{name}_check/1 function would
+      declare its default argument more than once.
+
+      Use a single clause and pattern match inside the do-block.
+      """
+    end
+
+    Module.put_attribute(module, :spek_defcheck_names, [name | defined])
+  end
+
+  defp validate_opts!(name, opts) do
+    case Keyword.drop(opts, @known_opts) do
+      [] ->
+        :ok
+
+      unknown ->
+        keys = unknown |> Keyword.keys() |> Enum.map_join(", ", &inspect/1)
+
+        raise ArgumentError, """
+        unknown option in defcheck #{name}
+
+        Expected one of:
+
+            - :args
+            - :reason
+
+        Got:
+
+            #{keys}
+        """
     end
   end
 end
