@@ -192,7 +192,7 @@ defmodule SpekTest do
     end
 
     test "raises if {:ctx, key} is used with an invalid context" do
-      assert_raise ArgumentError, ~r/cannot resolve check argument/, fn ->
+      assert_raise ArgumentError, ~r/Cannot resolve check argument/, fn ->
         Spek.eval?(
           %Check{module: Checks, fun: :from_bool, args: [{:ctx, :result}]},
           "not a map"
@@ -201,7 +201,7 @@ defmodule SpekTest do
     end
 
     test "raises if the key of {:ctx, key} is not an atom" do
-      assert_raise ArgumentError, ~r/cannot resolve check argument/, fn ->
+      assert_raise ArgumentError, ~r/Cannot resolve check argument/, fn ->
         Spek.eval?(
           %Check{module: Checks, fun: :from_bool, args: [{:ctx, "result"}]},
           %{result: true}
