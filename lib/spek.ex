@@ -1920,24 +1920,30 @@ defmodule Spek do
         false
 
       other ->
-        raise ArgumentError, """
-        invalid check function result
-
-        The function #{inspect(module)}.#{fun} returned an invalid value.
-
-        Expected one of:
-
-            - true
-            - false
-            - :ok
-            - :error
-            - {:ok, term}
-            - {:error, term}
-
-        Got:
-
-            #{inspect(other)}
-        """
+        __invalid_check_result__!(module, fun, other)
     end
+  end
+
+  @doc false
+  @spec __invalid_check_result__!(module, atom, term) :: no_return
+  def __invalid_check_result__!(module, fun, result) do
+    raise ArgumentError, """
+    invalid check function result
+
+    The function #{inspect(module)}.#{fun} returned an invalid value.
+
+    Expected one of:
+
+        - true
+        - false
+        - :ok
+        - :error
+        - {:ok, term}
+        - {:error, term}
+
+    Got:
+
+        #{inspect(result)}
+    """
   end
 end

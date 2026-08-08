@@ -3,9 +3,18 @@ defmodule Spek.MacrosTest do
 
   alias __MODULE__.Checks
   alias Spek.Check
+  alias Spek.Literal
+
+  defmodule Device do
+    @moduledoc false
+    @enforce_keys [:id]
+    defstruct [:id, :state]
+  end
 
   defmodule Checks do
     import Spek.Macros
+
+    alias Spek.MacrosTest.Device
 
     build_check(:user_active, [{:ctx, :state}, :active])
     build_check(:user_banned)
@@ -36,8 +45,12 @@ defmodule Spek.MacrosTest do
       device.charging?
     end
 
-    defcheck two_args_no_opts(one, two) do
+    defcheck two_args(one, two, args: [{:ctx, :one}, {:ctx, :two}]) do
       one == two
+    end
+
+    defcheck no_args_with_expression do
+      1 == 1
     end
 
     defcheck always_true() do
@@ -66,6 +79,81 @@ defmodule Spek.MacrosTest do
 
     defcheck with_default_arg(one, two \\ 2) do
       one < two
+    end
+
+    defcheck no_args_with_reason(reason: :not_today) do
+      1 == 2
+    end
+
+    defcheck no_args_literal_with_reason(reason: :never) do
+      false
+    end
+
+    defcheck longer_than_head([head | tail]) do
+      length(tail) > head
+    end
+
+    defcheck always_true_with_arg(device) do
+      true
+    end
+
+    defcheck always_false_with_arg(device, reason: :never_ready) do
+      false
+    end
+
+    defcheck default_arg_with_min_args(one, two \\ 2, args: [:ctx]) do
+      one < two
+    end
+
+    defcheck default_arg_with_max_args(one, two \\ 2,
+               args: [{:ctx, :one}, {:ctx, :two}]
+             ) do
+      one < two
+    end
+
+    defcheck all_args_defaulted(one \\ 1) do
+      one > 0
+    end
+
+    defcheck zero_arity_explicit_args(args: []) do
+      1 == 1
+    end
+
+    defcheck three_args(a, b, c, args: [{:ctx, :a}, {:ctx, :b}, {:ctx, :c}]) do
+      a == b and b == c
+    end
+
+    defcheck tagged_with_reason(account, reason: :unused) do
+      if account.balance >= 0, do: :ok, else: {:error, :account_unbalanced}
+    end
+
+    defcheck first_positive([head | _]) do
+      head > 0
+    end
+
+    defcheck device_active(%Device{state: state}) do
+      state == :active
+    end
+
+    defcheck two_key_map(%{state: state} = device) do
+      state == :active and map_size(device) == 2
+    end
+
+    defcheck positive(number) when is_integer(number) do
+      number > 0
+    end
+
+    defcheck guarded_literal(device) when is_map(device) do
+      true
+    end
+
+    defcheck guarded_with_default(low, high \\ 10)
+             when is_integer(low) and is_integer(high) do
+      low < high
+    end
+
+    defcheck passes_result_through(value) do
+      value
     end
   end
 
@@ -236,9 +324,9 @@ defmodule Spek.MacrosTest do
       assert Checks.rich_tuple(%{balance: 10_000}) == {:error, :not_rich}
     end
 
-    test "handles multiple arguments without options" do
-      assert Checks.two_args_no_opts(1, 1) == :ok
-      assert Checks.two_args_no_opts(1, 2) == {:error, :failed}
+    test "handles multiple arguments" do
+      assert Checks.two_args(1, 1) == :ok
+      assert Checks.two_args(1, 2) == {:error, :failed}
     end
 
     test "handles default arguments" do
@@ -247,6 +335,267 @@ defmodule Spek.MacrosTest do
       assert Checks.with_default_arg?(1, 3)
       assert Checks.with_default_arg?(1)
       refute Checks.with_default_arg?(3)
+    end
+
+    test "defaults :args to [] for zero-arity check functions" do
+      assert Checks.no_args_with_expression_check() == %Check{
+               args: [],
+               fun: :no_args_with_expression,
+               module: Spek.MacrosTest.Checks
+             }
+
+      assert Spek.eval?(Checks.no_args_with_expression_check()) == true
+    end
+
+    test "raises if the :args option does not match the function arity" do
+      assert_raise ArgumentError, ~r/Got 2 element\(s\)/, fn ->
+        defmodule BadArgsArity do
+          import Spek.Macros
+
+          defcheck mismatched(account, args: [:ctx, :ctx]) do
+            account.balance >= 0
+          end
+        end
+      end
+    end
+
+    test "raises for multi-argument check without the :args option" do
+      assert_raise ArgumentError, ~r/Expected 2 element\(s\)/, fn ->
+        defmodule MissingArgsOption do
+          import Spek.Macros
+
+          defcheck needs_args_option(one, two) do
+            one == two
+          end
+        end
+      end
+    end
+
+    test "accepts options for a check without arguments" do
+      assert Checks.no_args_with_reason() == {:error, :not_today}
+      assert Checks.no_args_with_reason?() == false
+
+      assert Checks.no_args_with_reason_check() == %Check{
+               args: [],
+               fun: :no_args_with_reason,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "accepts options for a check without arguments and a literal body" do
+      assert Checks.no_args_literal_with_reason() == {:error, :never}
+      assert Checks.no_args_literal_with_reason?() == false
+    end
+
+    test "treats a list argument as an argument, not as options" do
+      assert Checks.longer_than_head?([1, :a, :b]) == true
+      assert Checks.longer_than_head([5, :a, :b]) == {:error, :failed}
+
+      assert Checks.longer_than_head_check() == %Check{
+               args: [:ctx],
+               fun: :longer_than_head,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "raises if the :args option is not a list" do
+      assert_raise ArgumentError,
+                   ~r/invalid :args option.*Expected a list/s,
+                   fn ->
+                     defmodule NonListArgs do
+                       import Spek.Macros
+
+                       defcheck bad_args(account, args: :ctx) do
+                         account.balance >= 0
+                       end
+                     end
+                   end
+    end
+
+    test "raises if a check is defined more than once" do
+      assert_raise ArgumentError, ~r/duplicate check definition/, fn ->
+        defmodule MultipleClauses do
+          import Spek.Macros
+
+          defcheck state(:active) do
+            true
+          end
+
+          defcheck state(:inactive) do
+            false
+          end
+        end
+      end
+    end
+
+    test "raises the same error as a hand-written check for an invalid result" do
+      message = ~r/invalid check function result.*passes_result_through/s
+
+      assert_raise ArgumentError, message, fn ->
+        Checks.passes_result_through(nil)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        Checks.passes_result_through?(nil)
+      end
+
+      assert_raise ArgumentError, message, fn ->
+        Spek.eval?(Checks.passes_result_through_check(), nil)
+      end
+    end
+
+    test "raises for an unknown option" do
+      assert_raise ArgumentError,
+                   ~r/unknown option in defcheck typo.*:resaon/s,
+                   fn ->
+                     defmodule UnknownOption do
+                       import Spek.Macros
+
+                       defcheck typo(account, resaon: :account_unbalanced) do
+                         account.balance >= 0
+                       end
+                     end
+                   end
+    end
+
+    test "handles a literal body with arguments" do
+      assert Checks.always_true_with_arg?(:anything) == true
+      assert Checks.always_true_with_arg(:anything) == :ok
+
+      assert Checks.always_true_with_arg_check() == %Literal{
+               result: true,
+               satisfied?: true
+             }
+
+      assert Checks.always_false_with_arg?(:anything) == false
+      assert Checks.always_false_with_arg(:anything) == {:error, :never_ready}
+
+      assert Checks.always_false_with_arg_check() == %Literal{
+               result: false,
+               satisfied?: false
+             }
+    end
+
+    test "accepts :args matching the minimum arity of a defaulted function" do
+      assert Checks.default_arg_with_min_args?(1) == true
+      assert Checks.default_arg_with_min_args?(1, 0) == false
+
+      assert Checks.default_arg_with_min_args_check() == %Check{
+               args: [:ctx],
+               fun: :default_arg_with_min_args,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "accepts :args matching the maximum arity of a defaulted function" do
+      assert Checks.default_arg_with_max_args?(1) == true
+
+      assert Checks.default_arg_with_max_args_check() == %Check{
+               args: [{:ctx, :one}, {:ctx, :two}],
+               fun: :default_arg_with_max_args,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "handles a function whose arguments are all defaulted" do
+      assert Checks.all_args_defaulted?() == true
+      assert Checks.all_args_defaulted?(-1) == false
+
+      assert Checks.all_args_defaulted_check() == %Check{
+               args: [:ctx],
+               fun: :all_args_defaulted,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "accepts an explicit empty :args for a zero-arity check" do
+      assert Checks.zero_arity_explicit_args?() == true
+
+      assert Checks.zero_arity_explicit_args_check() == %Check{
+               args: [],
+               fun: :zero_arity_explicit_args,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "accepts an argument pattern that is not a valid expression" do
+      assert Checks.first_positive?([1, 2]) == true
+      assert Checks.first_positive([-1, 2]) == {:error, :failed}
+    end
+
+    test "accepts a struct pattern for a struct with enforced keys" do
+      device = %Device{id: 1, state: :active}
+
+      assert Checks.device_active?(device) == true
+
+      assert Checks.device_active(%Device{id: 1, state: :idle}) ==
+               {:error, :failed}
+    end
+
+    test "accepts a pattern that also binds the whole argument" do
+      assert Checks.two_key_map?(%{state: :active, id: 1}) == true
+      assert Checks.two_key_map?(%{state: :active, id: 1, extra: 1}) == false
+    end
+
+    test "raises from the check function if the pattern does not match" do
+      assert_raise FunctionClauseError, ~r/Checks\.device_active\/1/, fn ->
+        Checks.device_active?(%{})
+      end
+    end
+
+    test "supports guards" do
+      assert Checks.positive?(1) == true
+      assert Checks.positive?(-1) == false
+      assert Checks.positive(1) == :ok
+      assert Checks.positive(-1) == {:error, :failed}
+
+      assert Checks.positive_check() == %Check{
+               args: [:ctx],
+               fun: :positive,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "raises from the check function if the guard does not match" do
+      assert_raise FunctionClauseError, ~r/Checks\.positive\/1/, fn ->
+        Checks.positive?(:not_an_integer)
+      end
+    end
+
+    test "supports guards on a literal do-block" do
+      assert Checks.guarded_literal?(%{}) == true
+      assert Checks.guarded_literal(%{}) == :ok
+
+      assert_raise FunctionClauseError, fn ->
+        Checks.guarded_literal?(:not_a_map)
+      end
+    end
+
+    test "supports guards combined with default arguments" do
+      assert Checks.guarded_with_default?(1) == true
+      assert Checks.guarded_with_default?(1, 0) == false
+
+      assert_raise FunctionClauseError, fn ->
+        Checks.guarded_with_default?(:not_an_integer)
+      end
+    end
+
+    test "ignores :reason if the do-block returns a tagged result" do
+      assert Checks.tagged_with_reason(%{balance: 1}) == :ok
+
+      assert Checks.tagged_with_reason(%{balance: -1}) ==
+               {:error, :account_unbalanced}
+    end
+
+    test "handles more than two arguments" do
+      assert Checks.three_args?(1, 1, 1) == true
+      assert Checks.three_args(1, 1, 2) == {:error, :failed}
+
+      assert Checks.three_args_check() == %Check{
+               args: [{:ctx, :a}, {:ctx, :b}, {:ctx, :c}],
+               fun: :three_args,
+               module: Spek.MacrosTest.Checks
+             }
     end
   end
 end

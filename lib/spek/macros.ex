@@ -51,7 +51,7 @@ defmodule Spek.Macros do
     function_name = :"#{fun}_check"
 
     quote do
-      @spec unquote(function_name)() :: Spek.Check.t()
+      @spec unquote(function_name)(Spek.Check.args()) :: Spek.Check.t()
       def unquote(function_name)(args \\ unquote(args)) do
         %Spek.Check{
           module: unquote(module),
@@ -76,6 +76,15 @@ defmodule Spek.Macros do
     do-block and returns `:ok`, `:error`, `{:ok, term}`, or `{:error, term}`.
   - `{name}_check` - A function that returns a `Spek.Check` struct.
 
+  The arguments may be patterns, and the definition may have a guard. Both
+  apply to `{name}` alone, since `{name}?` delegates to it, so an argument that
+  does not match the pattern or does not satisfy the guard raises a
+  `FunctionClauseError` naming `{name}`.
+
+      defcheck positive(number) when is_integer(number) do
+        number > 0
+      end
+
   ## Options
 
   - `:args` - The list of arguments as used in the `Spek.Check` struct. The
@@ -86,6 +95,16 @@ defmodule Spek.Macros do
     arity raises an `ArgumentError` at compile time.
   - `:reason` - The reason used in the error tuple. Defaults to `:failed`. This
     value is only used if the do-block returns a boolean.
+
+  Options are passed as the last argument of the check definition. They are
+  recognized as a keyword list rather than by position, so a check without
+  arguments can take options too.
+
+      defcheck maintenance_mode(reason: :under_maintenance) do
+        Application.get_env(:my_app, :maintenance_mode, false)
+      end
+
+  An unrecognized option raises an `ArgumentError` at compile time.
 
   ## Do-block
 
@@ -199,28 +218,59 @@ defmodule Spek.Macros do
         organization: %Organization{id: 1}
       )
   """
-  # credo:disable-for-next-line
+  defmacro defcheck({:when, _, [{name, _, raw_args}, guard]}, do: body) do
+    expand_defcheck(name, raw_args, guard, body, __CALLER__.module)
+  end
+
   defmacro defcheck({name, _, raw_args}, do: body) do
-    raw_args = raw_args || []
+    expand_defcheck(name, raw_args, nil, body, __CALLER__.module)
+  end
 
-    {call_args, opts} =
-      case raw_args do
-        [call_args] ->
-          {call_args, []}
+  # credo:disable-for-next-line
+  defp expand_defcheck(name, raw_args, guard, body, module) do
+    {call_args, opts} = split_call_args(raw_args || [])
+    validate_opts!(name, opts)
+    register_name!(module, name)
 
-        raw_args when is_list(raw_args) ->
-          case Enum.split(raw_args, length(raw_args) - 1) do
-            {args, [list] = last_arg} when is_list(list) -> {args, last_arg}
-            _ -> {raw_args, []}
-          end
-      end
+    max_arity = length(call_args)
+    num_defaults = Enum.count(call_args, &match?({:\\, _, _}, &1))
+    min_arity = max_arity - num_defaults
 
-    call_args = List.wrap(call_args)
-    opts = List.first(opts) || []
+    default_check_args =
+      if min_arity <= 1 and max_arity >= 1, do: [:ctx], else: []
 
     reason = Keyword.get(opts, :reason, :failed)
-    check_args = Keyword.get(opts, :args, [:ctx])
-    module = __CALLER__.module
+    check_args = Keyword.get(opts, :args, default_check_args)
+
+    if not is_list(check_args) do
+      raise ArgumentError, """
+      invalid :args option in defcheck #{name}
+
+      Expected a list.
+
+      Got:
+
+          #{inspect(check_args)}
+      """
+    end
+
+    if length(check_args) not in min_arity..max_arity//1 do
+      arity_range =
+        if min_arity == max_arity,
+          do: "#{max_arity}",
+          else: "#{min_arity} to #{max_arity}"
+
+      raise ArgumentError, """
+      invalid :args option in defcheck #{name}
+
+      Expected #{arity_range} element(s), to match the arity of #{name}.
+
+      Got #{length(check_args)} element(s):
+
+          #{inspect(check_args)}
+      """
+    end
+
     check_fun_name = :"#{name}_check"
     predicate_fun_name = :"#{name}?"
 
@@ -229,11 +279,24 @@ defmodule Spek.Macros do
         quote(do: term())
       end
 
-    call_args_without_defaults =
-      Enum.map(call_args, fn
-        {:\\, _, [arg, _]} -> arg
-        arg -> arg
+    fresh_args = Macro.generate_arguments(max_arity, __MODULE__)
+
+    predicate_head_args =
+      call_args
+      |> Enum.zip(fresh_args)
+      |> Enum.map(fn
+        {{:\\, meta, [_arg, default]}, fresh} -> {:\\, meta, [fresh, default]}
+        {_arg, fresh} -> fresh
       end)
+
+    unused_call_args = mark_generated(call_args)
+
+    literal_predicate_head =
+      build_head(predicate_fun_name, unused_call_args, guard)
+
+    literal_name_head = build_head(name, unused_call_args, guard)
+    predicate_head = build_head(predicate_fun_name, predicate_head_args, nil)
+    name_head = build_head(name, call_args, guard)
 
     always_true? =
       case body do
@@ -255,19 +318,19 @@ defmodule Spek.Macros do
       always_true? ->
         ok_value = if is_boolean(body), do: :ok, else: body
 
-        quote do
-          @spec unquote(check_fun_name)(Spek.context()) :: Spek.Literal.t()
+        quote generated: true do
+          @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
           def unquote(check_fun_name)(args \\ unquote(check_args)) do
             %Spek.Literal{result: unquote(body), satisfied?: true}
           end
 
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) :: true
-          def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
+          def unquote(literal_predicate_head) do
             true
           end
 
           @spec unquote(name)(unquote_splicing(arg_types)) :: :ok
-          def unquote(name)(unquote_splicing(call_args)) do
+          def unquote(literal_name_head) do
             unquote(ok_value)
           end
         end
@@ -275,28 +338,28 @@ defmodule Spek.Macros do
       always_false? ->
         error_value = if is_boolean(body), do: {:error, reason}, else: body
 
-        quote do
-          @spec unquote(check_fun_name)(Spek.context()) :: Spek.Literal.t()
+        quote generated: true do
+          @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
           def unquote(check_fun_name)(args \\ unquote(check_args)) do
             %Spek.Literal{result: unquote(body), satisfied?: false}
           end
 
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
                   false
-          def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
+          def unquote(literal_predicate_head) do
             false
           end
 
           @spec unquote(name)(unquote_splicing(arg_types)) ::
                   {:error, unquote(reason)}
-          def unquote(name)(unquote_splicing(call_args)) do
+          def unquote(literal_name_head) do
             unquote(error_value)
           end
         end
 
       true ->
         quote generated: true do
-          @spec unquote(check_fun_name)(Spek.context()) :: Spek.Check.t()
+          @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Check.t()
           def unquote(check_fun_name)(args \\ unquote(check_args)) do
             %Spek.Check{
               module: unquote(module),
@@ -307,24 +370,112 @@ defmodule Spek.Macros do
 
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
                   boolean()
-          def unquote(predicate_fun_name)(unquote_splicing(call_args)) do
-            Spek.to_boolean(
-              unquote(name)(unquote_splicing(call_args_without_defaults))
-            )
+          def unquote(predicate_head) do
+            Spek.to_boolean(unquote(name)(unquote_splicing(fresh_args)))
           end
 
           @spec unquote(name)(unquote_splicing(arg_types)) :: Spek.result()
-          def unquote(name)(unquote_splicing(call_args)) do
+          def unquote(name_head) do
             case unquote(body) do
-              true -> :ok
-              false -> {:error, unquote(reason)}
-              :ok -> :ok
-              :error -> :error
-              {:ok, _} = result -> result
-              {:error, _} = result -> result
+              true ->
+                :ok
+
+              false ->
+                {:error, unquote(reason)}
+
+              :ok ->
+                :ok
+
+              :error ->
+                :error
+
+              {:ok, _} = result ->
+                result
+
+              {:error, _} = result ->
+                result
+
+              other ->
+                Spek.__invalid_check_result__!(
+                  unquote(module),
+                  unquote(name),
+                  other
+                )
             end
           end
         end
+    end
+  end
+
+  @known_opts [:args, :reason]
+
+  defp build_head(name, args, nil) do
+    quote(do: unquote(name)(unquote_splicing(args)))
+  end
+
+  defp build_head(name, args, guard) do
+    quote(do: unquote(name)(unquote_splicing(args)) when unquote(guard))
+  end
+
+  defp mark_generated(ast) do
+    Macro.prewalk(ast, fn node ->
+      Macro.update_meta(node, &Keyword.put(&1, :generated, true))
+    end)
+  end
+
+  defp split_call_args([]), do: {[], []}
+
+  defp split_call_args(args) do
+    last = List.last(args)
+
+    if last != [] and Keyword.keyword?(last) do
+      {Enum.drop(args, -1), last}
+    else
+      {args, []}
+    end
+  end
+
+  # defcheck emits a `{name}_check/1` with a default argument, and Elixir allows
+  # a default to be declared only once per function, so a check cannot be
+  # defined in multiple clauses.
+  defp register_name!(module, name) do
+    defined = Module.get_attribute(module, :spek_defcheck_names) || []
+
+    if name in defined do
+      raise ArgumentError, """
+      duplicate check definition
+
+      #{name} is already defined in this module, and a check cannot be split
+      into multiple clauses: the generated #{name}_check/1 function would
+      declare its default argument more than once.
+
+      Use a single clause and pattern match inside the do-block.
+      """
+    end
+
+    Module.put_attribute(module, :spek_defcheck_names, [name | defined])
+  end
+
+  defp validate_opts!(name, opts) do
+    case Keyword.drop(opts, @known_opts) do
+      [] ->
+        :ok
+
+      unknown ->
+        keys = unknown |> Keyword.keys() |> Enum.map_join(", ", &inspect/1)
+
+        raise ArgumentError, """
+        unknown option in defcheck #{name}
+
+        Expected one of:
+
+            - :args
+            - :reason
+
+        Got:
+
+            #{keys}
+        """
     end
   end
 end
