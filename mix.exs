@@ -14,7 +14,15 @@ defmodule Spek.MixProject do
       deps: deps(),
       test_coverage: [tool: ExCoveralls],
       dialyzer: [
-        plt_file: {:no_warn, ".plts/dialyzer.plt"}
+        plt_file: {:no_warn, ".plts/dialyzer.plt"},
+        flags: [
+          :error_handling,
+          :extra_return,
+          :missing_return,
+          :underspecs,
+          :unknown,
+          :unmatched_returns
+        ]
       ],
       aliases: aliases(),
       name: "Spek",
