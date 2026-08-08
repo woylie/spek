@@ -32,6 +32,7 @@ defmodule Spek.EvaluationError do
   @doc """
   Returns a new `EvaluationError` struct.
   """
+  @doc since: "0.1.0"
   @spec new() :: __MODULE__.t()
   @spec new(String.t()) :: __MODULE__.t()
   def new(message \\ @default_message) do
@@ -41,6 +42,7 @@ defmodule Spek.EvaluationError do
   @doc """
   Returns a new `EvaluationError` struct that contains the given expression.
   """
+  @doc since: "0.1.0"
   @spec with_expression(Spek.expression()) :: __MODULE__.t()
   @spec with_expression(String.t(), Spek.expression()) :: __MODULE__.t()
   def with_expression(message \\ @default_message, expression) do
@@ -54,6 +56,7 @@ defmodule Spek.EvaluationError do
   Collects the error results with `Spek.collect_results/2` and puts them into
   the given `EvaluationError` struct.
   """
+  @doc since: "0.2.0"
   @spec put_results(t) :: t
   def put_results(%__MODULE__{expression: nil} = error), do: error
 
