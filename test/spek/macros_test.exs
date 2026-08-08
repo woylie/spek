@@ -3,9 +3,18 @@ defmodule Spek.MacrosTest do
 
   alias __MODULE__.Checks
   alias Spek.Check
+  alias Spek.Literal
+
+  defmodule Device do
+    @moduledoc false
+    @enforce_keys [:id]
+    defstruct [:id, :state]
+  end
 
   defmodule Checks do
     import Spek.Macros
+
+    alias Spek.MacrosTest.Device
 
     build_check(:user_active, [{:ctx, :state}, :active])
     build_check(:user_banned)
@@ -84,6 +93,14 @@ defmodule Spek.MacrosTest do
       length(tail) > head
     end
 
+    defcheck always_true_with_arg(device) do
+      true
+    end
+
+    defcheck always_false_with_arg(device, reason: :never_ready) do
+      false
+    end
+
     defcheck default_arg_with_min_args(one, two \\ 2, args: [:ctx]) do
       one < two
     end
@@ -108,6 +125,31 @@ defmodule Spek.MacrosTest do
 
     defcheck tagged_with_reason(account, reason: :unused) do
       if account.balance >= 0, do: :ok, else: {:error, :account_unbalanced}
+    end
+
+    defcheck first_positive([head | _]) do
+      head > 0
+    end
+
+    defcheck device_active(%Device{state: state}) do
+      state == :active
+    end
+
+    defcheck two_key_map(%{state: state} = device) do
+      state == :active and map_size(device) == 2
+    end
+
+    defcheck positive(number) when is_integer(number) do
+      number > 0
+    end
+
+    defcheck guarded_literal(device) when is_map(device) do
+      true
+    end
+
+    defcheck guarded_with_default(low, high \\ 10)
+             when is_integer(low) and is_integer(high) do
+      low < high
     end
 
     defcheck passes_result_through(value) do
@@ -416,6 +458,24 @@ defmodule Spek.MacrosTest do
                    end
     end
 
+    test "handles a literal body with arguments" do
+      assert Checks.always_true_with_arg?(:anything) == true
+      assert Checks.always_true_with_arg(:anything) == :ok
+
+      assert Checks.always_true_with_arg_check() == %Literal{
+               result: true,
+               satisfied?: true
+             }
+
+      assert Checks.always_false_with_arg?(:anything) == false
+      assert Checks.always_false_with_arg(:anything) == {:error, :never_ready}
+
+      assert Checks.always_false_with_arg_check() == %Literal{
+               result: false,
+               satisfied?: false
+             }
+    end
+
     test "accepts :args matching the minimum arity of a defaulted function" do
       assert Checks.default_arg_with_min_args?(1) == true
       assert Checks.default_arg_with_min_args?(1, 0) == false
@@ -456,6 +516,68 @@ defmodule Spek.MacrosTest do
                fun: :zero_arity_explicit_args,
                module: Spek.MacrosTest.Checks
              }
+    end
+
+    test "accepts an argument pattern that is not a valid expression" do
+      assert Checks.first_positive?([1, 2]) == true
+      assert Checks.first_positive([-1, 2]) == {:error, :failed}
+    end
+
+    test "accepts a struct pattern for a struct with enforced keys" do
+      device = %Device{id: 1, state: :active}
+
+      assert Checks.device_active?(device) == true
+
+      assert Checks.device_active(%Device{id: 1, state: :idle}) ==
+               {:error, :failed}
+    end
+
+    test "accepts a pattern that also binds the whole argument" do
+      assert Checks.two_key_map?(%{state: :active, id: 1}) == true
+      assert Checks.two_key_map?(%{state: :active, id: 1, extra: 1}) == false
+    end
+
+    test "raises from the check function if the pattern does not match" do
+      assert_raise FunctionClauseError, ~r/Checks\.device_active\/1/, fn ->
+        Checks.device_active?(%{})
+      end
+    end
+
+    test "supports guards" do
+      assert Checks.positive?(1) == true
+      assert Checks.positive?(-1) == false
+      assert Checks.positive(1) == :ok
+      assert Checks.positive(-1) == {:error, :failed}
+
+      assert Checks.positive_check() == %Check{
+               args: [:ctx],
+               fun: :positive,
+               module: Spek.MacrosTest.Checks
+             }
+    end
+
+    test "raises from the check function if the guard does not match" do
+      assert_raise FunctionClauseError, ~r/Checks\.positive\/1/, fn ->
+        Checks.positive?(:not_an_integer)
+      end
+    end
+
+    test "supports guards on a literal do-block" do
+      assert Checks.guarded_literal?(%{}) == true
+      assert Checks.guarded_literal(%{}) == :ok
+
+      assert_raise FunctionClauseError, fn ->
+        Checks.guarded_literal?(:not_a_map)
+      end
+    end
+
+    test "supports guards combined with default arguments" do
+      assert Checks.guarded_with_default?(1) == true
+      assert Checks.guarded_with_default?(1, 0) == false
+
+      assert_raise FunctionClauseError, fn ->
+        Checks.guarded_with_default?(:not_an_integer)
+      end
     end
 
     test "ignores :reason if the do-block returns a tagged result" do
