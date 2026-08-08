@@ -11,6 +11,48 @@ defmodule SpekTest do
 
   doctest Spek, import: true
 
+  describe "pass/1" do
+    test "builds a literal for every truthy result" do
+      assert Spek.pass() == %Literal{result: true, satisfied?: true}
+      assert Spek.pass(true) == %Literal{result: true, satisfied?: true}
+      assert Spek.pass(:ok) == %Literal{result: :ok, satisfied?: true}
+
+      assert Spek.pass({:ok, "v"}) == %Literal{
+               result: {:ok, "v"},
+               satisfied?: true
+             }
+    end
+
+    test "raises for a falsy result" do
+      for result <- [false, :error, {:error, :reason}] do
+        assert_raise ArgumentError, ~r/invalid result for pass\/1/, fn ->
+          Spek.pass(result)
+        end
+      end
+    end
+  end
+
+  describe "fail/1" do
+    test "builds a literal for every falsy result" do
+      assert Spek.fail() == %Literal{result: false, satisfied?: false}
+      assert Spek.fail(false) == %Literal{result: false, satisfied?: false}
+      assert Spek.fail(:error) == %Literal{result: :error, satisfied?: false}
+
+      assert Spek.fail({:error, "v"}) == %Literal{
+               result: {:error, "v"},
+               satisfied?: false
+             }
+    end
+
+    test "raises for a truthy result" do
+      for result <- [true, :ok, {:ok, :value}] do
+        assert_raise ArgumentError, ~r/invalid result for fail\/1/, fn ->
+          Spek.fail(result)
+        end
+      end
+    end
+  end
+
   describe "eval?/2" do
     test "evaluates literal" do
       assert Spek.eval?(%Literal{satisfied?: true, result: true}) == true

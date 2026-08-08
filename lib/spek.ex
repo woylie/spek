@@ -310,6 +310,10 @@ defmodule Spek do
   @doc """
   Builds an expression that is always false.
 
+  Raises an `ArgumentError` if the result is not `false`, `:error`, or an error
+  tuple. Use `pass/1` for a result that is true, or `literal/1` to derive the
+  outcome from the result.
+
   ## Example
 
       iex> fail()
@@ -324,7 +328,25 @@ defmodule Spek do
   @doc type: :builder
   @spec fail(falsy) :: Literal.t()
   def fail(result \\ false) do
-    %Literal{result: result, satisfied?: false}
+    if to_boolean(result) do
+      raise ArgumentError, """
+      invalid result for fail/1
+
+      Expected one of:
+
+          - false
+          - :error
+          - {:error, term}
+
+      Got:
+
+          #{inspect(result)}
+
+      Use pass/1 to build an expression that is always true.
+      """
+    else
+      %Literal{result: result, satisfied?: false}
+    end
   end
 
   @doc """
@@ -441,6 +463,10 @@ defmodule Spek do
   @doc """
   Builds an expression that is always true.
 
+  Raises an `ArgumentError` if the result is not `true`, `:ok`, or an ok tuple.
+  Use `fail/1` for a result that is false, or `literal/1` to derive the outcome
+  from the result.
+
   ## Example
 
       iex> pass()
@@ -455,7 +481,25 @@ defmodule Spek do
   @doc type: :builder
   @spec pass(truthy) :: Literal.t()
   def pass(result \\ true) do
-    %Literal{result: result, satisfied?: true}
+    if to_boolean(result) do
+      %Literal{result: result, satisfied?: true}
+    else
+      raise ArgumentError, """
+      invalid result for pass/1
+
+      Expected one of:
+
+          - true
+          - :ok
+          - {:ok, term}
+
+      Got:
+
+          #{inspect(result)}
+
+      Use fail/1 to build an expression that is always false.
+      """
+    end
   end
 
   @doc """
