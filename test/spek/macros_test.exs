@@ -49,6 +49,10 @@ defmodule Spek.MacrosTest do
       one == two
     end
 
+    defcheck two_args_no_opts(one, two) do
+      one == two
+    end
+
     defcheck no_args_with_expression do
       1 == 1
     end
@@ -359,16 +363,15 @@ defmodule Spek.MacrosTest do
       end
     end
 
-    test "raises for multi-argument check without the :args option" do
-      assert_raise ArgumentError, ~r/Expected 2 element\(s\)/, fn ->
-        defmodule MissingArgsOption do
-          import Spek.Macros
+    test "omits the :args default for multi-argument check functions" do
+      assert Checks.two_args_no_opts_check([{:ctx, :one}, {:ctx, :two}]) ==
+               %Check{
+                 args: [{:ctx, :one}, {:ctx, :two}],
+                 fun: :two_args_no_opts,
+                 module: Spek.MacrosTest.Checks
+               }
 
-          defcheck needs_args_option(one, two) do
-            one == two
-          end
-        end
-      end
+      refute function_exported?(Checks, :two_args_no_opts_check, 0)
     end
 
     test "accepts options for a check without arguments" do

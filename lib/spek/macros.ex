@@ -91,9 +91,11 @@ defmodule Spek.Macros do
   - `:args` - The list of arguments as used in the `Spek.Check` struct. The
     length of the list must match an arity of the check function. Defaults to
     `[:ctx]` if the function can be called with one argument, or to `[]` if
-    the function can only be called without arguments. For any other arity,
-    the option is required. A mismatch between the option and the function
-    arity raises an `ArgumentError` at compile time.
+    the function can only be called without arguments. A check that always
+    takes two or more arguments has no default, so `{name}_check/1` is
+    generated without a default argument and the arguments are passed at the
+    call site. A mismatch between the option and the function arity raises an
+    `ArgumentError` at compile time.
   - `:reason` - The reason used in the error tuple. Defaults to `:failed`. This
     value is only used if the do-block returns a boolean.
 
@@ -238,43 +240,12 @@ defmodule Spek.Macros do
     num_defaults = Enum.count(call_args, &match?({:\\, _, _}, &1))
     min_arity = max_arity - num_defaults
 
-    default_check_args =
-      if min_arity <= 1 and max_arity >= 1, do: [:ctx], else: []
-
     reason = Keyword.get(opts, :reason, :failed)
-    check_args = Keyword.get(opts, :args, default_check_args)
-
-    if not is_list(check_args) do
-      raise ArgumentError, """
-      invalid :args option in defcheck #{name}
-
-      Expected a list.
-
-      Got:
-
-          #{inspect(check_args)}
-      """
-    end
-
-    if length(check_args) not in min_arity..max_arity//1 do
-      arity_range =
-        if min_arity == max_arity,
-          do: "#{max_arity}",
-          else: "#{min_arity} to #{max_arity}"
-
-      raise ArgumentError, """
-      invalid :args option in defcheck #{name}
-
-      Expected #{arity_range} element(s), to match the arity of #{name}.
-
-      Got #{length(check_args)} element(s):
-
-          #{inspect(check_args)}
-      """
-    end
-
     check_fun_name = :"#{name}_check"
     predicate_fun_name = :"#{name}?"
+
+    check_head =
+      build_check_head(name, check_fun_name, opts, min_arity, max_arity)
 
     arg_types =
       for _ <- call_args do
@@ -322,7 +293,7 @@ defmodule Spek.Macros do
 
         quote generated: true do
           @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
-          def unquote(check_fun_name)(args \\ unquote(check_args)) do
+          def unquote(check_head) do
             %Spek.Literal{result: unquote(body), satisfied?: true}
           end
 
@@ -342,7 +313,7 @@ defmodule Spek.Macros do
 
         quote generated: true do
           @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
-          def unquote(check_fun_name)(args \\ unquote(check_args)) do
+          def unquote(check_head) do
             %Spek.Literal{result: unquote(body), satisfied?: false}
           end
 
@@ -362,7 +333,7 @@ defmodule Spek.Macros do
       true ->
         quote generated: true do
           @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Check.t()
-          def unquote(check_fun_name)(args \\ unquote(check_args)) do
+          def unquote(check_head) do
             %Spek.Check{
               module: unquote(module),
               fun: unquote(name),
@@ -419,6 +390,52 @@ defmodule Spek.Macros do
     quote(do: unquote(name)(unquote_splicing(args)) when unquote(guard))
   end
 
+  defp build_check_head(name, check_fun_name, opts, min_arity, max_arity) do
+    case Keyword.fetch(opts, :args) do
+      {:ok, check_args} ->
+        validate_check_args!(name, check_args, min_arity, max_arity)
+        quote(do: unquote(check_fun_name)(args \\ unquote(check_args)))
+
+      :error when min_arity <= 1 ->
+        check_args = if max_arity >= 1, do: [:ctx], else: []
+        quote(do: unquote(check_fun_name)(args \\ unquote(check_args)))
+
+      :error ->
+        quote(do: unquote(check_fun_name)(args))
+    end
+  end
+
+  defp validate_check_args!(name, check_args, min_arity, max_arity) do
+    if not is_list(check_args) do
+      raise ArgumentError, """
+      invalid :args option in defcheck #{name}
+
+      Expected a list.
+
+      Got:
+
+          #{inspect(check_args)}
+      """
+    end
+
+    if length(check_args) not in min_arity..max_arity//1 do
+      arity_range =
+        if min_arity == max_arity,
+          do: "#{max_arity}",
+          else: "#{min_arity} to #{max_arity}"
+
+      raise ArgumentError, """
+      invalid :args option in defcheck #{name}
+
+      Expected #{arity_range} element(s), to match the arity of #{name}.
+
+      Got #{length(check_args)} element(s):
+
+          #{inspect(check_args)}
+      """
+    end
+  end
+
   defp mark_generated(ast) do
     Macro.prewalk(ast, fn node ->
       Macro.update_meta(node, &Keyword.put(&1, :generated, true))
@@ -437,9 +454,8 @@ defmodule Spek.Macros do
     end
   end
 
-  # defcheck emits a `{name}_check/1` with a default argument, and Elixir allows
-  # a default to be declared only once per function, so a check cannot be
-  # defined in multiple clauses.
+  # defcheck emits a whole `{name}_check/1` function, not a clause of one, so a
+  # check cannot be defined in multiple clauses.
   defp register_name!(module, name) do
     defined = Module.get_attribute(module, :spek_defcheck_names) || []
 
@@ -448,8 +464,8 @@ defmodule Spek.Macros do
       duplicate check definition
 
       #{name} is already defined in this module, and a check cannot be split
-      into multiple clauses: the generated #{name}_check/1 function would
-      declare its default argument more than once.
+      into multiple clauses: the generated #{name}_check/1 function would be
+      defined more than once.
 
       Use a single clause and pattern match inside the do-block.
       """

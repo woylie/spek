@@ -133,9 +133,7 @@ defmodule Spek.MacrosMatrixTest do
   describe "argument and option forms" do
     test "compile without warnings and behave as documented" do
       combinations =
-        for arg <- @arg_forms,
-            opt <- @opt_forms,
-            opt.supplies_args? or min_arity(arg) <= 1 do
+        for arg <- @arg_forms, opt <- @opt_forms do
           name = "#{arg.id}_args_#{opt.id}_opts"
           {name, arg, opt}
         end
@@ -152,10 +150,12 @@ defmodule Spek.MacrosMatrixTest do
 
       module = compile_without_warnings!("ArgumentForms", definitions)
 
-      for {name, arg, _opt} <- combinations do
+      for {name, arg, opt} <- combinations do
         assert apply(module, :"#{name}?", arg.call) == true, name
         assert apply(module, :"#{name}", arg.call) == :ok, name
-        assert %Check{} = apply(module, :"#{name}_check", []), name
+
+        assert %Check{} = apply(module, :"#{name}_check", check_call(arg, opt)),
+               name
       end
     end
   end
@@ -163,7 +163,7 @@ defmodule Spek.MacrosMatrixTest do
   describe "do-block forms" do
     test "compile without warnings and behave as documented" do
       literals =
-        for body <- @literal_bodies, args <- [[], ["device"]] do
+        for body <- @literal_bodies, args <- [[], ["device"], ["a", "b"]] do
           {"literal_#{body.id}_#{length(args)}_args", args, body}
         end
 
@@ -185,7 +185,7 @@ defmodule Spek.MacrosMatrixTest do
         assert apply(module, :"#{name}", call) == body.result, name
 
         assert %Literal{satisfied?: ^satisfied?} =
-                 apply(module, :"#{name}_check", []),
+                 apply(module, :"#{name}_check", literal_check_call(args)),
                name
       end
 
@@ -195,6 +195,16 @@ defmodule Spek.MacrosMatrixTest do
         assert %Check{} = apply(module, :"#{name}_check", []), name
       end
     end
+  end
+
+  defp check_call(arg, opt) do
+    if opt.supplies_args? or min_arity(arg) <= 1,
+      do: [],
+      else: [Enum.map(arg.args, fn _ -> :ctx end)]
+  end
+
+  defp literal_check_call(args) do
+    if length(args) <= 1, do: [], else: [Enum.map(args, fn _ -> :ctx end)]
   end
 
   defp min_arity(%{args: args}) do

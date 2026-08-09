@@ -29,6 +29,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `Spek.fail/1` for a truthy one.
 - Raise an `ArgumentError` at compile time in `Spek.Macros.defcheck/2` if the
   `:args` option does not match the check function arity.
+- Generate the `{name}_check/1` function without a default argument in
+  `Spek.Macros.defcheck/2` if the check function always takes two or more
+  arguments.
 
 ### Fixed
 
