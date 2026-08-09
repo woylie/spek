@@ -23,7 +23,7 @@ defmodule Spek.Macros do
         build_check(:active_user)
       end
 
-  This will compile a `{fun}_check/0` function like this:
+  This will compile a `{fun}_check` function like this:
 
       def active_user_check(args \\\\ [:ctx]) do
         %Check{module: MyApp.MyModule, fun: :active_user, args: args}
@@ -31,7 +31,7 @@ defmodule Spek.Macros do
 
   You can then use this function when building complex rules:
 
-      Spek.all_of[
+      Spek.all_of([
         MyApp.MyModule.active_user_check(),
         # ...
       ])
@@ -68,18 +68,16 @@ defmodule Spek.Macros do
 
   ## Generated functions
 
-  The arity of the generated function depends on the number of arguments passed
-  to the macro.
-
   - `{name}?` - A predicate function that returns the result of the boolean
     expression defined in the do-block.
   - `{name}` - A function that runs the expression defined in the
     do-block and returns `:ok`, `:error`, `{:ok, term}`, or `{:error, term}`.
   - `{name}_check` - A function that returns a `Spek.Check` struct.
 
-  The arguments may be patterns, and the definition may have a guard. Both
-  apply to `{name}` alone, since `{name}?` delegates to it, so an argument that
-  does not match the pattern or does not satisfy the guard raises a
+  `{name}?` and `{name}` take the arguments of the check definition. The
+  arguments may be patterns, and the definition may have a guard. Both apply to
+  `{name}` alone, since `{name}?` delegates to it, so an argument that does not
+  match the pattern or does not satisfy the guard raises a
   `FunctionClauseError` naming `{name}`.
 
       defcheck positive(number) when is_integer(number) do
@@ -88,16 +86,16 @@ defmodule Spek.Macros do
 
   ## Options
 
-  - `:args` - The list of arguments as used in the `Spek.Check` struct. The
-    length of the list must match an arity of the check function. Defaults to
-    `[:ctx]` if the function can be called with one argument, or to `[]` if
-    the function can only be called without arguments. A check that always
-    takes two or more arguments has no default, so `{name}_check/1` is
-    generated without a default argument and the arguments are passed at the
-    call site. A mismatch between the option and the function arity raises an
-    `ArgumentError` at compile time.
+  - `:args` - The list of arguments as used in the `Spek.Check` struct. Its
+    length must match an arity of the check function, or an `ArgumentError` is
+    raised at compile time. Defaults to `[:ctx]` for a check that takes one
+    argument, and to `[]` for one that takes none.
   - `:reason` - The reason used in the error tuple. Defaults to `:failed`. This
     value is only used if the do-block returns a boolean.
+
+  A check that always takes two or more arguments has no default `:args`, so
+  `{name}_check/1` is generated without a default argument and the arguments
+  are passed at every call site.
 
   Options are passed as the last argument of the check definition. They are
   recognized as a keyword list rather than by position, so a check without
@@ -116,17 +114,12 @@ defmodule Spek.Macros do
 
   ## Example
 
-  ### With boolean expression
-
   This macro call:
 
       defmodule MyApp.MyModule do
         import Spek.Macros
 
-        defcheck account_balanced(account,
-                   args: [:ctx],
-                   reason: :account_unbalanced
-                 ) do
+        defcheck account_balanced(account, reason: :account_unbalanced) do
           account.balance >= 0
         end
       end
@@ -134,11 +127,11 @@ defmodule Spek.Macros do
   Will result in these three functions:
 
       def account_balanced?(account) do
-        account.balance >= 0
+        Spek.to_boolean(account_balanced(account))
       end
 
       def account_balanced(account) do
-        if account_balanced(account),
+        if account.balance >= 0,
           do: :ok,
           else: {:error, :account_unbalanced}
       end
@@ -147,15 +140,11 @@ defmodule Spek.Macros do
         %Check{module: MyApp.MyModule, fun: :account_balanced, args: args}
       end
 
-  Alternatively, you can return :ok/:error values in the do-block with the same
-  result:
+  The do-block can return `:ok` and `:error` values instead of a boolean, with
+  the same result:
 
-      defmodule MyApp.MyModule do
-        import Spek.Macros
-
-        defcheck account_balanced(account, args: [:ctx]) do
-          if account.balance >= 0, do: :ok, else: {:error, :account_unbalanced}
-        end
+      defcheck account_balanced(account) do
+        if account.balance >= 0, do: :ok, else: {:error, :account_unbalanced}
       end
 
   The `account_balanced?/1` and `account_balanced/1` functions can be used
@@ -172,51 +161,24 @@ defmodule Spek.Macros do
 
       Spek.eval(transfer_rule(), %Account{balance: 100})
 
-  You can also override the check arguments, e.g. if you combine multiple checks
-  that work on different data:
-
-      def transfer_rule do
-        Spek.all_of([
-          account_balanced_check([{:ctx, :account}]),
-          # additional checks
-        ])
-      end
+  Passing arguments to `account_balanced_check/1` overrides the default, e.g. if
+  you combine checks that work on different data. With
+  `account_balanced_check([{:ctx, :account}])` in the rule above, the check
+  receives the `:account` key of the context instead of the whole context:
 
       Spek.eval(transfer_rule(), account: %Account{balance: 100})
 
-  The generated functions can have an arbitrary number of arguments. For
-  example, this macro call defines two arguments, `user` and `organization`:
+  A check can take any number of arguments. With two or more, the arguments are
+  passed when the check is built, or given as the `:args` option:
 
       defcheck matching_organization(user, organization,
-                 args: [{:ctx, :user}, {:ctx, :organization}],
                  reason: :no_organization_match
                ) do
         user.organization_id == organization.id
       end
 
-  Which is expanded to:
-
-      def matching_organization?(user, account) do
-        user.organization_id == organization.id
-      end
-
-      def matching_organization(user, account) do
-        if matching_organization?(user, account),
-          do: :ok,
-          else: {:error, :no_organization_match}
-      end
-
-      def matching_organization_check(args \\\\ [{:ctx, :user}, {:ctx, :organization}]) do
-        %Check{
-          module: MyApp.MyModule,
-          fun: :matching_organization,
-          args: args
-        }
-      end
-
-  In this case, we would call the Spek evaluation functions like this:
-
-      Spek.eval(matching_organization_check(),
+      Spek.eval(
+        matching_organization_check([{:ctx, :user}, {:ctx, :organization}]),
         user: %User{organization_id: 1},
         organization: %Organization{id: 1}
       )
