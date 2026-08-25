@@ -256,6 +256,7 @@ defmodule Spek.Macros do
     cond do
       always_true? ->
         ok_value = if is_boolean(body), do: :ok, else: body
+        ok_type = result_type(ok_value)
 
         quote generated: true do
           @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
@@ -268,7 +269,7 @@ defmodule Spek.Macros do
             true
           end
 
-          @spec unquote(name)(unquote_splicing(arg_types)) :: :ok
+          @spec unquote(name)(unquote_splicing(arg_types)) :: unquote(ok_type)
           def unquote(literal_name_head) do
             unquote(ok_value)
           end
@@ -276,6 +277,7 @@ defmodule Spek.Macros do
 
       always_false? ->
         error_value = if is_boolean(body), do: {:error, reason}, else: body
+        error_type = result_type(error_value)
 
         quote generated: true do
           @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
@@ -290,7 +292,7 @@ defmodule Spek.Macros do
           end
 
           @spec unquote(name)(unquote_splicing(arg_types)) ::
-                  {:error, unquote(reason)}
+                  unquote(error_type)
           def unquote(literal_name_head) do
             unquote(error_value)
           end
@@ -355,6 +357,14 @@ defmodule Spek.Macros do
   defp build_head(name, args, guard) do
     quote(do: unquote(name)(unquote_splicing(args)) when unquote(guard))
   end
+
+  defp result_type(value) when is_atom(value), do: value
+
+  defp result_type({tag, term} = value)
+       when tag in [:ok, :error] and is_atom(term),
+       do: value
+
+  defp result_type(_), do: quote(do: Spek.result())
 
   defp build_check_head(name, check_fun_name, opts, min_arity, max_arity) do
     case Keyword.fetch(opts, :args) do
