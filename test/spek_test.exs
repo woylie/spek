@@ -1515,7 +1515,10 @@ defmodule SpekTest do
         {false, false, []},
         {:error, false, []},
         {{:ok, "good"}, true, ["good"]},
-        {{:error, "bad"}, false, ["bad"]}
+        {{:error, "bad"}, false, ["bad"]},
+        {{:error, [:too_short, :no_digit]}, false, [[:too_short, :no_digit]]},
+        {{:error, []}, false, [[]]},
+        {{:ok, [:a, [:b]]}, true, [[:a, [:b]]]}
       ]
 
       for {result, satisfied?, expected} <- test_cases do
@@ -1533,7 +1536,10 @@ defmodule SpekTest do
         {false, false, []},
         {:error, false, []},
         {{:ok, "good"}, true, ["good"]},
-        {{:error, "bad"}, false, ["bad"]}
+        {{:error, "bad"}, false, ["bad"]},
+        {{:error, [:too_short, :no_digit]}, false, [[:too_short, :no_digit]]},
+        {{:error, []}, false, [[]]},
+        {{:ok, [:a, [:b]]}, true, [[:a, [:b]]]}
       ]
 
       for {result, satisfied?, expected} <- test_cases do
@@ -1586,6 +1592,18 @@ defmodule SpekTest do
              }) == ["good", "bad"]
     end
 
+    test "keeps a list result out of its siblings" do
+      assert Spek.collect_results(%AllOf{
+               children: [
+                 %Literal{
+                   result: {:error, [:too_short, :no_digit]},
+                   satisfied?: false
+                 },
+                 %Literal{result: {:error, :taken}, satisfied?: false}
+               ]
+             }) == [[:too_short, :no_digit], :taken]
+    end
+
     test "returns nested results" do
       assert Spek.collect_results(%AllOf{
                children: [
@@ -1615,7 +1633,9 @@ defmodule SpekTest do
         {false, false, []},
         {:error, false, []},
         {{:ok, "good"}, true, ["good"]},
-        {{:error, "bad"}, false, []}
+        {{:error, "bad"}, false, []},
+        {{:error, [:too_short, :no_digit]}, false, []},
+        {{:ok, [:a, [:b]]}, true, [[:a, [:b]]]}
       ]
 
       for {result, satisfied?, expected} <- test_cases do
@@ -1636,7 +1656,9 @@ defmodule SpekTest do
         {false, false, []},
         {:error, false, []},
         {{:ok, "good"}, true, []},
-        {{:error, "bad"}, false, ["bad"]}
+        {{:error, "bad"}, false, ["bad"]},
+        {{:error, [:too_short, :no_digit]}, false, [[:too_short, :no_digit]]},
+        {{:error, []}, false, [[]]}
       ]
 
       for {result, satisfied?, expected} <- test_cases do
@@ -1657,7 +1679,9 @@ defmodule SpekTest do
         {false, false, []},
         {:error, false, []},
         {{:ok, "good"}, true, ["good"]},
-        {{:error, "bad"}, false, []}
+        {{:error, "bad"}, false, []},
+        {{:error, [:too_short, :no_digit]}, false, []},
+        {{:ok, [:a, [:b]]}, true, [[:a, [:b]]]}
       ]
 
       for {result, satisfied?, expected} <- test_cases do
@@ -1681,7 +1705,9 @@ defmodule SpekTest do
         {false, false, []},
         {:error, false, []},
         {{:ok, "good"}, true, []},
-        {{:error, "bad"}, false, ["bad"]}
+        {{:error, "bad"}, false, ["bad"]},
+        {{:error, [:too_short, :no_digit]}, false, [[:too_short, :no_digit]]},
+        {{:error, []}, false, [[]]}
       ]
 
       for {result, satisfied?, expected} <- test_cases do

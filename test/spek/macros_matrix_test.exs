@@ -204,11 +204,12 @@ defmodule Spek.MacrosMatrixTest do
       for {name, args, body} <- literals do
         call = List.duplicate(:ignored, length(args))
         satisfied? = body.satisfied?
+        result = body.result
 
         assert apply(module, :"#{name}?", call) == body.satisfied?, name
         assert apply(module, :"#{name}", call) == body.result, name
 
-        assert %Literal{satisfied?: ^satisfied?} =
+        assert %Literal{satisfied?: ^satisfied?, result: ^result} =
                  apply(module, :"#{name}_check", literal_check_call(args)),
                name
       end

@@ -72,7 +72,8 @@ defmodule Spek.Macros do
     expression defined in the do-block.
   - `{name}` - A function that runs the expression defined in the
     do-block and returns `:ok`, `:error`, `{:ok, term}`, or `{:error, term}`.
-  - `{name}_check` - A function that returns a `Spek.Check` struct.
+  - `{name}_check` - A function that returns a `Spek.Check` struct, or a
+    `Spek.Literal` struct if the do-block returns a literal.
 
   `{name}?` and `{name}` take the arguments of the check definition. The
   arguments may be patterns, and the definition may have a guard. Both apply to
@@ -115,6 +116,25 @@ defmodule Spek.Macros do
 
   The do-block is required to return a boolean, `:ok`, `:error`, `{:ok, term}`,
   or `{:error, term}`.
+
+  ## Literal do-blocks
+
+  If the do-block returns a literal, `{name}_check` returns a `Spek.Literal`
+  struct instead of a `Spek.Check` struct. The `:result` of the `Spek.Literal`
+  is the value that `{name}` returns.
+
+      defcheck maintenance_mode(reason: :under_maintenance) do
+        false
+      end
+
+      maintenance_mode()
+      #=> {:error, :under_maintenance}
+
+      maintenance_mode_check()
+      #=> %Spek.Literal{result: {:error, :under_maintenance}, satisfied?: false}
+
+  A do-block that references a check argument does not return a literal, even
+  when it returns a tuple.
 
   ## Example
 
@@ -261,7 +281,7 @@ defmodule Spek.Macros do
         quote generated: true do
           @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
           def unquote(check_head) do
-            %Spek.Literal{result: unquote(body), satisfied?: true}
+            %Spek.Literal{result: unquote(ok_value), satisfied?: true}
           end
 
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) :: true
@@ -282,7 +302,7 @@ defmodule Spek.Macros do
         quote generated: true do
           @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
           def unquote(check_head) do
-            %Spek.Literal{result: unquote(body), satisfied?: false}
+            %Spek.Literal{result: unquote(error_value), satisfied?: false}
           end
 
           @spec unquote(predicate_fun_name)(unquote_splicing(arg_types)) ::
