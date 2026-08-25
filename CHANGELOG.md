@@ -21,6 +21,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   returns a literal.
 - Collect the `:reason` option of `Spek.Macros.defcheck/2` when the do-block
   returns a literal.
+- Don't flatten list results in `Spek.collect_results/1` and
+  `Spek.collect_results/2`.
 
 ## [0.4.0] - 2026-08-09
 

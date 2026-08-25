@@ -1726,6 +1726,27 @@ defmodule Spek do
       iex> Spek.collect_results(expression)
       ["a", "b", "c"]
 
+  If a check or literal result value contains a list, the list values are not
+  flattened.
+
+      iex> expression =
+      ...>   %AllOf{
+      ...>     children: [
+      ...>       %Literal{
+      ...>         result: {:error, [:too_short, :no_digit]},
+      ...>         satisfied?: false
+      ...>       },
+      ...>       %Literal{result: {:error, :taken}, satisfied?: false}
+      ...>     ]
+      ...>   }
+      iex> Spek.collect_results(expression)
+      [[:too_short, :no_digit], :taken]
+
+      iex> Spek.collect_results(
+      ...>   %Literal{result: {:error, []}, satisfied?: false}
+      ...> )
+      [[]]
+
   Tagged results within `Not` expressions are collected as well.
 
       iex> Spek.collect_results(
@@ -1742,7 +1763,6 @@ defmodule Spek do
   def collect_results(expression) do
     expression
     |> do_collect_results()
-    |> List.flatten()
     |> Enum.uniq()
   end
 
@@ -1759,11 +1779,11 @@ defmodule Spek do
   end
 
   defp do_collect_results(%AllOf{children: children}) do
-    Enum.map(children, &do_collect_results/1)
+    Enum.flat_map(children, &do_collect_results/1)
   end
 
   defp do_collect_results(%AnyOf{children: children}) do
-    Enum.map(children, &do_collect_results/1)
+    Enum.flat_map(children, &do_collect_results/1)
   end
 
   @doc """
@@ -1828,6 +1848,22 @@ defmodule Spek do
       iex> Spek.collect_results(expression, :error)
       ["b"]
 
+  If a check or literal result value contains a list, the list values are not
+  flattened.
+
+      iex> expression =
+      ...>   %AllOf{
+      ...>     children: [
+      ...>       %Literal{
+      ...>         result: {:error, [:too_short, :no_digit]},
+      ...>         satisfied?: false
+      ...>       },
+      ...>       %Literal{result: {:error, :taken}, satisfied?: false}
+      ...>     ]
+      ...>   }
+      iex> Spek.collect_results(expression, :error)
+      [[:too_short, :no_digit], :taken]
+
   `Not` reverses which tagged results are returned:
 
       iex> expression =
@@ -1849,7 +1885,6 @@ defmodule Spek do
   def collect_results(expression, only) when only in [:ok, :error] do
     expression
     |> do_collect_results(only == :ok)
-    |> List.flatten()
     |> Enum.uniq()
   end
 
@@ -1866,11 +1901,11 @@ defmodule Spek do
   end
 
   defp do_collect_results(%AllOf{children: children}, only) do
-    Enum.map(children, &do_collect_results(&1, only))
+    Enum.flat_map(children, &do_collect_results(&1, only))
   end
 
   defp do_collect_results(%AnyOf{children: children}, only) do
-    Enum.map(children, &do_collect_results(&1, only))
+    Enum.flat_map(children, &do_collect_results(&1, only))
   end
 
   @doc """
