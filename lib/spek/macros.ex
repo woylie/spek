@@ -107,6 +107,10 @@ defmodule Spek.Macros do
 
   An unrecognized option raises an `ArgumentError` at compile time.
 
+  Because options are recognized by shape, the last argument of a check cannot
+  be a keyword list pattern: it is read as options and rejected as unknown.
+  Bind the argument and match on it in the do-block instead.
+
   ## Do-block
 
   The do-block is required to return a boolean, `:ok`, `:error`, `{:ok, term}`,
@@ -237,7 +241,7 @@ defmodule Spek.Macros do
       case body do
         true -> true
         :ok -> true
-        {:ok, _} -> true
+        {:ok, _} -> Macro.quoted_literal?(body)
         _ -> false
       end
 
@@ -245,7 +249,7 @@ defmodule Spek.Macros do
       case body do
         false -> true
         :error -> true
-        {:error, _} -> true
+        {:error, _} -> Macro.quoted_literal?(body)
         _ -> false
       end
 
@@ -455,6 +459,9 @@ defmodule Spek.Macros do
         Got:
 
             #{keys}
+
+        The last argument is read as options when it is a keyword list. If this
+        was meant as an argument pattern, bind it and match inside the do-block.
         """
     end
   end
