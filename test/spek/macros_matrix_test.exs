@@ -130,6 +130,27 @@ defmodule Spek.MacrosMatrixTest do
     }
   ]
 
+  @computed_bodies [
+    %{id: "ok_tuple", body: "{:ok, a}", satisfied?: true, result: {:ok, 1}},
+    %{
+      id: "error_tuple",
+      body: "{:error, a}",
+      satisfied?: false,
+      result: {:error, 1}
+    }
+  ]
+
+  @result_specs %{
+    literal_true: ":ok",
+    literal_false: "{:error, :failed}",
+    literal_ok: ":ok",
+    literal_error: ":error",
+    literal_ok_tuple: "{:ok, :v}",
+    literal_error_tuple: "{:error, :v}",
+    computed_ok_tuple: "Spek.result()",
+    computed_error_tuple: "Spek.result()"
+  }
+
   describe "argument and option forms" do
     test "compile without warnings and behave as documented" do
       combinations =
@@ -170,8 +191,11 @@ defmodule Spek.MacrosMatrixTest do
       runtimes =
         for body <- @runtime_bodies, do: {"runtime_#{body.id}", ["a"], body}
 
+      computed =
+        for body <- @computed_bodies, do: {"computed_#{body.id}", ["a"], body}
+
       definitions =
-        for {name, args, body} <- literals ++ runtimes do
+        for {name, args, body} <- literals ++ runtimes ++ computed do
           definition(name, args, nil, body.body)
         end
 
@@ -189,10 +213,20 @@ defmodule Spek.MacrosMatrixTest do
                name
       end
 
-      for {name, _args, body} <- runtimes do
+      for {name, _args, body} <- runtimes ++ computed do
         assert apply(module, :"#{name}?", [1]) == body.satisfied?, name
         assert apply(module, :"#{name}", [1]) == body.result, name
         assert %Check{} = apply(module, :"#{name}_check", []), name
+      end
+    end
+  end
+
+  describe "generated specs" do
+    test "name the value the check function returns" do
+      specs = specs(Spek.ResultChecks)
+
+      for {name, return} <- @result_specs do
+        assert specs[name] == return, to_string(name)
       end
     end
   end
@@ -234,6 +268,15 @@ defmodule Spek.MacrosMatrixTest do
         #{body}
       end
     """
+  end
+
+  defp specs(module) do
+    {:ok, specs} = Code.Typespec.fetch_specs(module)
+
+    Map.new(specs, fn {{name, _arity}, [form | _]} ->
+      {:"::", _, [_head, return]} = Code.Typespec.spec_to_quoted(name, form)
+      {name, Macro.to_string(return)}
+    end)
   end
 
   defp compile_without_warnings!(module_name, definitions) do

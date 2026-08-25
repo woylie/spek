@@ -107,6 +107,10 @@ defmodule Spek.Macros do
 
   An unrecognized option raises an `ArgumentError` at compile time.
 
+  Because options are recognized by shape, the last argument of a check cannot
+  be a keyword list pattern: it is read as options and rejected as unknown.
+  Bind the argument and match on it in the do-block instead.
+
   ## Do-block
 
   The do-block is required to return a boolean, `:ok`, `:error`, `{:ok, term}`,
@@ -237,7 +241,7 @@ defmodule Spek.Macros do
       case body do
         true -> true
         :ok -> true
-        {:ok, _} -> true
+        {:ok, _} -> Macro.quoted_literal?(body)
         _ -> false
       end
 
@@ -245,13 +249,14 @@ defmodule Spek.Macros do
       case body do
         false -> true
         :error -> true
-        {:error, _} -> true
+        {:error, _} -> Macro.quoted_literal?(body)
         _ -> false
       end
 
     cond do
       always_true? ->
         ok_value = if is_boolean(body), do: :ok, else: body
+        ok_type = result_type(ok_value)
 
         quote generated: true do
           @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
@@ -264,7 +269,7 @@ defmodule Spek.Macros do
             true
           end
 
-          @spec unquote(name)(unquote_splicing(arg_types)) :: :ok
+          @spec unquote(name)(unquote_splicing(arg_types)) :: unquote(ok_type)
           def unquote(literal_name_head) do
             unquote(ok_value)
           end
@@ -272,6 +277,7 @@ defmodule Spek.Macros do
 
       always_false? ->
         error_value = if is_boolean(body), do: {:error, reason}, else: body
+        error_type = result_type(error_value)
 
         quote generated: true do
           @spec unquote(check_fun_name)(Spek.Check.args()) :: Spek.Literal.t()
@@ -286,7 +292,7 @@ defmodule Spek.Macros do
           end
 
           @spec unquote(name)(unquote_splicing(arg_types)) ::
-                  {:error, unquote(reason)}
+                  unquote(error_type)
           def unquote(literal_name_head) do
             unquote(error_value)
           end
@@ -351,6 +357,14 @@ defmodule Spek.Macros do
   defp build_head(name, args, guard) do
     quote(do: unquote(name)(unquote_splicing(args)) when unquote(guard))
   end
+
+  defp result_type(value) when is_atom(value), do: value
+
+  defp result_type({tag, term} = value)
+       when tag in [:ok, :error] and is_atom(term),
+       do: value
+
+  defp result_type(_), do: quote(do: Spek.result())
 
   defp build_check_head(name, check_fun_name, opts, min_arity, max_arity) do
     case Keyword.fetch(opts, :args) do
@@ -455,6 +469,9 @@ defmodule Spek.Macros do
         Got:
 
             #{keys}
+
+        The last argument is read as options when it is a keyword list. If this
+        was meant as an argument pattern, bind it and match inside the do-block.
         """
     end
   end

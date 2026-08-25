@@ -461,6 +461,20 @@ defmodule Spek.MacrosTest do
                    end
     end
 
+    test "raises for a keyword list in the last argument position" do
+      assert_raise ArgumentError,
+                   ~r/unknown option in defcheck has_role.*:role.*argument pattern/s,
+                   fn ->
+                     defmodule KeywordArgument do
+                       import Spek.Macros
+
+                       defcheck has_role(role: role) do
+                         role == :admin
+                       end
+                     end
+                   end
+    end
+
     test "handles a literal body with arguments" do
       assert Checks.always_true_with_arg?(:anything) == true
       assert Checks.always_true_with_arg(:anything) == :ok
