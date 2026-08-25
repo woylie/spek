@@ -234,7 +234,7 @@ defmodule Spek.MacrosTest do
 
     test "can define check without args and opts that is always true" do
       assert Checks.always_true_check() == %Spek.Literal{
-               result: true,
+               result: :ok,
                satisfied?: true
              }
 
@@ -244,7 +244,7 @@ defmodule Spek.MacrosTest do
 
     test "can define check without args and opts that is always false" do
       assert Checks.always_false_check() == %Spek.Literal{
-               result: false,
+               result: {:error, :failed},
                satisfied?: false
              }
 
@@ -480,7 +480,7 @@ defmodule Spek.MacrosTest do
       assert Checks.always_true_with_arg(:anything) == :ok
 
       assert Checks.always_true_with_arg_check() == %Literal{
-               result: true,
+               result: :ok,
                satisfied?: true
              }
 
@@ -488,9 +488,22 @@ defmodule Spek.MacrosTest do
       assert Checks.always_false_with_arg(:anything) == {:error, :never_ready}
 
       assert Checks.always_false_with_arg_check() == %Literal{
-               result: false,
+               result: {:error, :never_ready},
                satisfied?: false
              }
+    end
+
+    test "collects the declared reason of a constant check" do
+      rule =
+        Spek.all_of([
+          Checks.always_false_with_arg_check(),
+          Checks.account_balanced_check()
+        ])
+
+      assert {:error, %Spek.EvaluationError{results: results}} =
+               Spek.eval_collect_all(rule, %{balance: -1})
+
+      assert Enum.sort(results) == [:account_unbalanced, :never_ready]
     end
 
     test "accepts :args matching the minimum arity of a defaulted function" do
