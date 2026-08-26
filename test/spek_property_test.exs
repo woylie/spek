@@ -2,7 +2,10 @@ defmodule SpekPropertyTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
+  alias Spek.AllOf
+  alias Spek.AnyOf
   alias Spek.Checks
+  alias Spek.Not
 
   @context_keys [:a, :b, :c, :d, :e]
 
@@ -57,6 +60,28 @@ defmodule SpekPropertyTest do
                Spek.eval?(Spek.optimize(expression), context)
     end
   end
+
+  property "optimize/1 leaves no nested AllOf in AllOf or AnyOf in AnyOf" do
+    check all expression <- expression() do
+      refute same_type_nesting?(Spek.optimize(expression))
+    end
+  end
+
+  defp same_type_nesting?(%AllOf{children: children}) do
+    Enum.any?(children, &match?(%AllOf{}, &1)) or
+      Enum.any?(children, &same_type_nesting?/1)
+  end
+
+  defp same_type_nesting?(%AnyOf{children: children}) do
+    Enum.any?(children, &match?(%AnyOf{}, &1)) or
+      Enum.any?(children, &same_type_nesting?/1)
+  end
+
+  defp same_type_nesting?(%Not{expression: expression}) do
+    same_type_nesting?(expression)
+  end
+
+  defp same_type_nesting?(_), do: false
 
   property "optimize/1 is idempotent" do
     check all expression <- expression() do

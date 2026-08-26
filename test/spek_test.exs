@@ -853,6 +853,54 @@ defmodule SpekTest do
       assert Spek.optimize(check) == check
     end
 
+    test "merges a nested AllOf into its parent" do
+      a = %Check{module: Checks, fun: :a, args: []}
+      b = %Check{module: Checks, fun: :b, args: []}
+      c = %Check{module: Checks, fun: :c, args: []}
+
+      assert Spek.optimize(%AllOf{children: [a, %AllOf{children: [b, c]}]}) ==
+               %AllOf{children: [a, b, c]}
+
+      assert Spek.optimize(%AllOf{
+               children: [a, %AllOf{children: [b, %AllOf{children: [c]}]}]
+             }) == %AllOf{children: [a, b, c]}
+    end
+
+    test "merges a nested AnyOf into its parent" do
+      a = %Check{module: Checks, fun: :a, args: []}
+      b = %Check{module: Checks, fun: :b, args: []}
+      c = %Check{module: Checks, fun: :c, args: []}
+
+      assert Spek.optimize(%AnyOf{children: [a, %AnyOf{children: [b, c]}]}) ==
+               %AnyOf{children: [a, b, c]}
+    end
+
+    test "deduplicates across a merged AllOf" do
+      a = %Check{module: Checks, fun: :a, args: []}
+      b = %Check{module: Checks, fun: :b, args: []}
+
+      assert Spek.optimize(%AllOf{children: [a, %AllOf{children: [a, b]}]}) ==
+               %AllOf{children: [a, b]}
+    end
+
+    test "applies the complement law across a merged AllOf" do
+      a = %Check{module: Checks, fun: :a, args: []}
+      b = %Check{module: Checks, fun: :b, args: []}
+
+      assert Spek.optimize(%AllOf{
+               children: [a, %AllOf{children: [%Not{expression: a}, b]}]
+             }) == %Literal{satisfied?: false, result: false}
+    end
+
+    test "applies the complement law across a merged AnyOf" do
+      a = %Check{module: Checks, fun: :a, args: []}
+      b = %Check{module: Checks, fun: :b, args: []}
+
+      assert Spek.optimize(%AnyOf{
+               children: [a, %AnyOf{children: [%Not{expression: a}, b]}]
+             }) == %Literal{satisfied?: true, result: true}
+    end
+
     test "removes nested not" do
       assert Spek.optimize(%Not{
                expression: %Not{
@@ -1865,6 +1913,14 @@ defmodule SpekTest do
         Spek.eval_collect_all(expression, context)
 
       results
+    end
+
+    test "merging a nested expression preserves the results", ctx do
+      %{a: a, b: b, c: c, context: context} = ctx
+      expression = %AllOf{children: [a, %AllOf{children: [b, c]}]}
+
+      assert collected(expression, context) ==
+               collected(Spek.optimize(expression), context)
     end
 
     test "deduplication preserves the results", %{a: a, context: context} do

@@ -1253,9 +1253,10 @@ defmodule Spek do
   result of `A` alone.
 
   The identity, annihilation, absorption and complement laws remove
-  sub-expressions this way. Deduplication, factoring, De Morgan's laws, double
-  negation elimination and the negation of a literal rewrite the expression
-  without removing anything, and leave the collected results unchanged.
+  sub-expressions this way. Associativity, deduplication, factoring, De Morgan's
+  laws, double negation elimination and the negation of a literal rewrite the
+  expression without removing anything, and leave the collected results
+  unchanged.
 
   ## Examples
 
@@ -1293,6 +1294,26 @@ defmodule Spek do
         ]
       }
 
+  A nested expression of the same type is merged into its parent.
+
+      iex> Spek.optimize(%AllOf{
+      ...>   children: [
+      ...>     %Check{module: RenderChecks, fun: :gpu_available, args: []},
+      ...>     %AllOf{
+      ...>       children: [
+      ...>         %Check{module: RenderChecks, fun: :gpu_available, args: []},
+      ...>         %Check{module: RenderChecks, fun: :texture_cache_warm, args: []}
+      ...>       ]
+      ...>     }
+      ...>   ]
+      ...> })
+      %AllOf{
+        children: [
+          %Check{module: RenderChecks, fun: :gpu_available, args: []},
+          %Check{module: RenderChecks, fun: :texture_cache_warm, args: []}
+        ]
+      }
+
   ## Optimizations
 
   | Optimization | Formula |
@@ -1309,6 +1330,8 @@ defmodule Spek do
   | Empty disjunction | `anyof() = false` |
   | Single-child conjunction elimination | `allof(A) = A` |
   | Single-child disjunction elimination | `anyof(A) = A` |
+  | Associativity (AND) | `allof(A, allof(B, C)) = allof(A, B, C)` |
+  | Associativity (OR) | `anyof(A, anyof(B, C)) = anyof(A, B, C)` |
   | Deduplication (AND) | `A and A = A` |
   | Deduplication (OR) | `A or A = A` |
   | Complement (AND) | `A and (not A) = false` |
@@ -1372,7 +1395,11 @@ defmodule Spek do
     optimize_pass(child)
   end
 
-  defp optimize_pass(%AllOf{children: [_ | _]} = all_of) do
+  defp optimize_pass(%AllOf{children: [_ | _] = children} = all_of) do
+    # allof(A, allof(B, C)) = allof(A, B, C)
+    # Flattening before factoring lets factoring see the merged children.
+    all_of = %{all_of | children: flatten_all_of(children)}
+
     case factorize(all_of) do
       %AllOf{} = all_of ->
         do_optimize_all_of(all_of)
@@ -1390,7 +1417,10 @@ defmodule Spek do
     optimize_pass(child)
   end
 
-  defp optimize_pass(%AnyOf{children: [_ | _]} = any_of) do
+  defp optimize_pass(%AnyOf{children: [_ | _] = children} = any_of) do
+    # anyof(A, anyof(B, C)) = anyof(A, B, C)
+    any_of = %{any_of | children: flatten_any_of(children)}
+
     case factorize(any_of) do
       %AnyOf{} = any_of ->
         do_optimize_any_of(any_of)
@@ -1400,8 +1430,22 @@ defmodule Spek do
     end
   end
 
+  defp flatten_all_of(children) do
+    Enum.flat_map(children, fn
+      %AllOf{children: grandchildren} -> grandchildren
+      child -> [child]
+    end)
+  end
+
+  defp flatten_any_of(children) do
+    Enum.flat_map(children, fn
+      %AnyOf{children: grandchildren} -> grandchildren
+      child -> [child]
+    end)
+  end
+
   # credo:disable-for-next-line
-  defp do_optimize_all_of(%AllOf{children: [_ | _] = children}) do
+  defp do_optimize_all_of(%AllOf{children: children}) do
     {children, _} =
       Enum.reduce_while(children, {[], MapSet.new()}, fn child, {acc, seen} ->
         child = optimize_pass(child)
