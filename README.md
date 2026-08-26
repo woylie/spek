@@ -16,6 +16,7 @@ expressions.
 - Optimization of boolean expressions using boolean algebra:
   - Identity
   - Annihilation
+  - Associativity
   - Complement
   - Double negation
   - De Morgan transformations
@@ -671,35 +672,31 @@ function will factor out these common checks.
       fun: :legal_clearance_completed,
       args: [:ctx],
     },
-    %Spek.AllOf{
+    %Spek.Check{
+      module: Checks,
+      fun: :proxy_media_available,
+      args: [:ctx],
+    },
+    %Spek.AnyOf{
       children: [
-        %Spek.Check{
-          module: Checks,
-          fun: :proxy_media_available,
-          args: [:ctx],
-        },
-        %Spek.AnyOf{
+        %Spek.AllOf{
           children: [
-            %Spek.AllOf{
-              children: [
-                %Spek.Check{
-                  module: Checks,
-                  fun: :color_grade_locked,
-                  args: [:ctx],
-                },
-                %Spek.Check{
-                  module: Checks,
-                  fun: :audio_mix_completed,
-                  args: [:ctx],
-                }
-              ]
+            %Spek.Check{
+              module: Checks,
+              fun: :color_grade_locked,
+              args: [:ctx],
             },
             %Spek.Check{
               module: Checks,
-              fun: :post_supervisor_approval,
+              fun: :audio_mix_completed,
               args: [:ctx],
             }
           ]
+        },
+        %Spek.Check{
+          module: Checks,
+          fun: :post_supervisor_approval,
+          args: [:ctx],
         }
       ]
     }
