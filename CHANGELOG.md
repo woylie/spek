@@ -8,6 +8,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-26
+
 ### Added
 
 - Apply the associativity laws in `Spek.optimize/1`.
@@ -112,7 +114,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Initial release.
 
-[unreleased]: https://github.com/woylie/spek/compare/0.4.0...HEAD
+[unreleased]: https://github.com/woylie/spek/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/woylie/spek/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/woylie/spek/compare/0.3.1...0.4.0
 [0.3.1]: https://github.com/woylie/spek/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/woylie/spek/compare/0.2.0...0.3.0

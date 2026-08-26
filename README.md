@@ -41,7 +41,7 @@ Add `spek` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:spek, "~> 0.4.0"}
+    {:spek, "~> 0.5.0"}
   ]
 end
 ```
