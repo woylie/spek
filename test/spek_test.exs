@@ -1,5 +1,5 @@
 defmodule SpekTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias Spek.AllOf
   alias Spek.AnyOf

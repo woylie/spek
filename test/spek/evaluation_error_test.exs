@@ -1,5 +1,5 @@
 defmodule Spek.EvaluationErrorTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   describe "put_results/1" do
     test "returns struct unchanged if it has no expression" do

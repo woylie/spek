@@ -1,5 +1,5 @@
 defmodule Spek.MacrosTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias __MODULE__.Checks
   alias Spek.Check
