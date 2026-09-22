@@ -12,6 +12,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Add `Spek.format/1` and `Spek.format/2`.
 
+### Security
+
+- Don't include the whole evaluation context in the exception that is raised
+  when a context key is missing.
+- Don't include the an invalid check function result in the exception.
+
 ## [0.5.0] - 2026-08-26
 
 ### Added
