@@ -691,12 +691,9 @@ defmodule Spek do
     satisfied?
   end
 
-  def eval?(
-        %Check{module: module, fun: fun, args: args},
-        context
-      ) do
+  def eval?(%Check{module: module, fun: fun} = check, context) do
     module
-    |> apply(fun, replace_args(args, context))
+    |> apply(fun, replace_args(check, context))
     |> check_result_to_boolean!(module, fun)
   end
 
@@ -1020,11 +1017,11 @@ defmodule Spek do
   end
 
   defp do_eval_tree(
-         %Check{module: module, fun: fun, args: args} = check,
+         %Check{module: module, fun: fun} = check,
          context,
          _
        ) do
-    result = apply(module, fun, replace_args(args, context))
+    result = apply(module, fun, replace_args(check, context))
 
     %{
       check
@@ -1098,42 +1095,74 @@ defmodule Spek do
     end
   end
 
-  defp replace_args([], _), do: []
+  defp replace_args(%Check{args: []}, _), do: []
 
-  defp replace_args(args, context) do
-    Enum.map(args, &replace_arg(&1, context))
+  defp replace_args(%Check{args: args} = check, context) do
+    Enum.map(args, &replace_arg(&1, context, check))
   end
 
-  defp replace_arg(:ctx, context), do: context
+  defp replace_arg(:ctx, context, _), do: context
 
-  defp replace_arg({:ctx, key}, context)
+  defp replace_arg({:ctx, key}, context, check)
        when is_atom(key) and is_map(context) do
-    Map.fetch!(context, key)
+    case Map.fetch(context, key) do
+      {:ok, value} -> value
+      :error -> missing_context_key!(check, key)
+    end
   end
 
-  defp replace_arg({:ctx, key}, context)
+  defp replace_arg({:ctx, key}, context, check)
        when is_atom(key) and is_list(context) do
-    Keyword.fetch!(context, key)
+    case Keyword.fetch(context, key) do
+      {:ok, value} -> value
+      :error -> missing_context_key!(check, key)
+    end
   end
 
-  defp replace_arg({:ctx, key}, context) do
+  defp replace_arg({:ctx, key}, context, check) do
     raise ArgumentError, """
     invalid check argument
 
-    Cannot resolve check argument. Expected the key to be an atom and the
-    context to be a map or a keyword list.
+    Expected the key to be an atom and the context to be a map or a keyword
+    list.
 
-    Got key:
+    Check:
+
+        #{check_name(check)}
+
+    Key:
 
         #{inspect(key)}
 
-    Got context:
+    Context:
 
-        #{inspect(context)}
+        #{type_of(context)}
     """
   end
 
-  defp replace_arg(arg, _), do: arg
+  defp replace_arg(arg, _, _), do: arg
+
+  @spec missing_context_key!(Check.t(), atom) :: no_return
+  defp missing_context_key!(check, key) do
+    raise ArgumentError, """
+    missing context key
+
+    The context passed to the evaluation function does not have the key this
+    check argument references.
+
+    Check:
+
+        #{check_name(check)}
+
+    Key:
+
+        #{inspect(key)}
+    """
+  end
+
+  defp check_name(%Check{module: module, fun: fun, args: args}) do
+    "#{inspect(module)}.#{fun}/#{length(args)}"
+  end
 
   @doc """
   Evaluates the given expression with `eval_tree/2` and collects the results
@@ -2153,7 +2182,25 @@ defmodule Spek do
 
     Got:
 
-        #{inspect(result)}
+        #{describe_result(result)}
     """
   end
+
+  defp describe_result(result) when is_atom(result), do: inspect(result)
+  defp describe_result(result), do: type_of(result)
+
+  defp type_of(term) when is_boolean(term), do: "a boolean"
+  defp type_of(term) when is_atom(term), do: "an atom"
+  defp type_of(term) when is_binary(term), do: "a binary"
+  defp type_of(term) when is_integer(term), do: "an integer"
+  defp type_of(term) when is_float(term), do: "a float"
+  defp type_of(term) when is_list(term), do: "a list"
+  defp type_of(%module{}), do: "a #{inspect(module)} struct"
+  defp type_of(term) when is_map(term), do: "a map"
+  defp type_of(term) when is_tuple(term), do: "a #{tuple_size(term)}-tuple"
+  defp type_of(term) when is_function(term), do: "a function"
+  defp type_of(term) when is_pid(term), do: "a pid"
+  defp type_of(term) when is_reference(term), do: "a reference"
+  defp type_of(term) when is_port(term), do: "a port"
+  defp type_of(_), do: "a bitstring"
 end

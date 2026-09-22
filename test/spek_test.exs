@@ -346,7 +346,7 @@ defmodule SpekTest do
     end
 
     test "raises if {:ctx, key} is used with an invalid context" do
-      assert_raise ArgumentError, ~r/Cannot resolve check argument/, fn ->
+      assert_raise ArgumentError, ~r/invalid check argument/, fn ->
         Spek.eval?(
           %Check{module: Checks, fun: :from_bool, args: [{:ctx, :result}]},
           "not a map"
@@ -355,12 +355,70 @@ defmodule SpekTest do
     end
 
     test "raises if the key of {:ctx, key} is not an atom" do
-      assert_raise ArgumentError, ~r/Cannot resolve check argument/, fn ->
+      assert_raise ArgumentError, ~r/invalid check argument/, fn ->
         Spek.eval?(
           %Check{module: Checks, fun: :from_bool, args: [{:ctx, "result"}]},
           %{result: true}
         )
       end
+    end
+
+    test "raises if the context does not have the key" do
+      check = %Check{module: Checks, fun: :from_bool, args: [{:ctx, :missing}]}
+
+      for context <- [%{secret: "hunter2"}, [secret: "hunter2"]] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Spek.eval?(check, context)
+          end
+
+        message = Exception.message(error)
+
+        assert message =~ "missing context key"
+        assert message =~ "Spek.Checks.from_bool/1"
+        assert message =~ ":missing"
+        refute message =~ "hunter2"
+      end
+    end
+
+    test "does not put the context into the invalid argument message" do
+      check = %Check{module: Checks, fun: :from_bool, args: [{:ctx, "result"}]}
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Spek.eval?(check, "hunter2")
+        end
+
+      message = Exception.message(error)
+
+      assert message =~ "Context:"
+      assert message =~ "a binary"
+      refute message =~ "hunter2"
+    end
+
+    test "names an invalid atom result" do
+      check = %Check{module: Checks, fun: :return_arg, args: [:yes]}
+
+      error = assert_raise ArgumentError, fn -> Spek.eval?(check) end
+      message = Exception.message(error)
+
+      assert message =~ "invalid check function result"
+      assert message =~ ":yes"
+    end
+
+    test "describes an invalid result by type without printing it" do
+      check = %Check{module: Checks, fun: :return_arg, args: [{:ctx, :secret}]}
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Spek.eval?(check, %{secret: "hunter2"})
+        end
+
+      message = Exception.message(error)
+
+      assert message =~ "invalid check function result"
+      assert message =~ "a binary"
+      refute message =~ "hunter2"
     end
   end
 
