@@ -96,6 +96,7 @@ defmodule Spek.MixProject do
       groups_for_docs: [
         "Builder Functions": &(&1[:type] == :builder),
         "Evaluation Functions": &(&1[:type] == :evaluation),
+        "Inspection Functions": &(&1[:type] == :inspection),
         "Optimization Functions": &(&1[:type] == :optimization)
       ]
     ]

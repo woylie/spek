@@ -5,6 +5,7 @@ defmodule SpekPropertyTest do
   alias Spek.AllOf
   alias Spek.AnyOf
   alias Spek.Checks
+  alias Spek.EvaluationError
   alias Spek.Not
 
   @context_keys [:a, :b, :c, :d, :e]
@@ -89,4 +90,27 @@ defmodule SpekPropertyTest do
       assert Spek.optimize(optimized) == optimized
     end
   end
+
+  property "format/2 ignores evaluation state" do
+    check all expression <- expression(),
+              context <- context() do
+      evaluated =
+        case Spek.eval_tree_all(expression, context) do
+          {:ok, expression} -> expression
+          {:error, %EvaluationError{expression: expression}} -> expression
+        end
+
+      assert Spek.format(evaluated) == Spek.format(expression)
+    end
+  end
+
+  property "format/2 only changes whitespace when it wraps" do
+    check all expression <- expression(),
+              width <- integer(0..120) do
+      assert strip_whitespace(Spek.format(expression, width: width)) ==
+               strip_whitespace(Spek.format(expression))
+    end
+  end
+
+  defp strip_whitespace(string), do: String.replace(string, ~r/\s/, "")
 end

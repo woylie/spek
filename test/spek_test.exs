@@ -53,6 +53,118 @@ defmodule SpekTest do
     end
   end
 
+  describe "format/2" do
+    test "renders a check as a call" do
+      assert Spek.format(%Check{module: Media, fun: :encoded, args: []}) ==
+               "Media.encoded()"
+
+      assert Spek.format(%Check{
+               module: Media,
+               fun: :expired,
+               args: [:ctx, {:ctx, :license}, 30, "hd"]
+             }) == ~s{Media.expired(ctx, ctx.license, 30, "hd")}
+    end
+
+    test "renders a literal as its boolean value" do
+      for result <- [true, :ok, {:ok, "v"}] do
+        assert Spek.format(Spek.literal(result)) == "true"
+      end
+
+      for result <- [false, :error, {:error, :reason}] do
+        assert Spek.format(Spek.literal(result)) == "false"
+      end
+    end
+
+    test "renders a group without children as the value it evaluates to" do
+      assert Spek.format(%AllOf{children: []}) == "(true)"
+      assert Spek.format(%AnyOf{children: []}) == "(false)"
+    end
+
+    test "parenthesizes every group" do
+      assert Spek.format(nested_rule()) ==
+               "(Media.encoded(ctx) and (Media.reviewed(ctx) or " <>
+                 "(not Media.held(ctx))))"
+    end
+
+    test "ignores evaluation state" do
+      expression =
+        %AllOf{
+          children: [
+            %Check{module: Checks, fun: :always_true, args: []},
+            %Check{module: Checks, fun: :always_false, args: []}
+          ]
+        }
+
+      {:error, %EvaluationError{expression: evaluated}} =
+        Spek.eval_tree_all(expression)
+
+      assert Spek.format(evaluated) == Spek.format(expression)
+    end
+
+    test "breaks only the groups that do not fit the width" do
+      assert Spek.format(nested_rule(), width: 60) ==
+               """
+               (
+                 Media.encoded(ctx)
+                 and (Media.reviewed(ctx) or (not Media.held(ctx)))
+               )\
+               """
+
+      assert Spek.format(nested_rule(), width: 40) ==
+               """
+               (
+                 Media.encoded(ctx)
+                 and (
+                   Media.reviewed(ctx)
+                   or (not Media.held(ctx))
+                 )
+               )\
+               """
+    end
+
+    test "leaves a group that fits the width alone" do
+      assert Spek.format(nested_rule(), width: 80) ==
+               Spek.format(nested_rule())
+    end
+
+    test "defaults to a single line" do
+      assert Spek.format(nested_rule(), width: :infinity) ==
+               Spek.format(nested_rule())
+    end
+
+    test "raises for an unknown option" do
+      message = ~r/unknown keys \[:pretty\].*allowed keys are: \[:width\]/
+
+      assert_raise ArgumentError, message, fn ->
+        Spek.format(nested_rule(), pretty: true)
+      end
+    end
+
+    test "raises for an invalid width" do
+      assert_raise ArgumentError, ~r/invalid :width option/, fn ->
+        Spek.format(nested_rule(), width: -1)
+      end
+
+      assert_raise ArgumentError, ~r/invalid :width option/, fn ->
+        Spek.format(nested_rule(), width: "80")
+      end
+    end
+
+    defp nested_rule do
+      %AllOf{
+        children: [
+          %Check{module: Media, fun: :encoded, args: [:ctx]},
+          %AnyOf{
+            children: [
+              %Check{module: Media, fun: :reviewed, args: [:ctx]},
+              %Not{expression: %Check{module: Media, fun: :held, args: [:ctx]}}
+            ]
+          }
+        ]
+      }
+    end
+  end
+
   describe "eval?/2" do
     test "evaluates literal" do
       assert Spek.eval?(%Literal{satisfied?: true, result: true}) == true

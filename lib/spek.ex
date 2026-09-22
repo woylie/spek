@@ -168,6 +168,7 @@ defmodule Spek do
       }
   """
 
+  alias Inspect.Algebra
   alias Spek.AllOf
   alias Spek.AnyOf
   alias Spek.Check
@@ -557,6 +558,107 @@ defmodule Spek do
       all_of(a, negate(b)),
       all_of(negate(a), b)
     ])
+  end
+
+  ## Inspection
+
+  @doc """
+  Formats an expression as a string.
+
+  ## Options
+
+  - `:width` - the column to wrap at. Defaults to `:infinity`.
+
+  ## Examples
+
+      iex> format(
+      ...>   all_of([
+      ...>     check(Media, :encoded),
+      ...>     any_of([check(Media, :reviewed), check(Media, :approved)])
+      ...>   ])
+      ...> )
+      "(Media.encoded(ctx) and (Media.reviewed(ctx) or Media.approved(ctx)))"
+
+      iex> format(negate(check(Media, :expired, [{:ctx, :license}, 30])))
+      "(not Media.expired(ctx.license, 30))"
+
+      iex> format(literal({:error, :no_license}))
+      "false"
+
+      iex> format(all_of([]))
+      "(true)"
+
+  If `width` is set to an integer, groups that don't fit within the given limit
+  are broken into multiple lines.
+
+      iex> format(any_of([check(Media, :a), check(Media, :b)]), width: 24)
+      "(\\n  Media.a(ctx)\\n  or Media.b(ctx)\\n)"
+
+      iex> format(any_of([check(Media, :a), check(Media, :b)]), width: 80)
+      "(Media.a(ctx) or Media.b(ctx))"
+  """
+  @doc type: :inspection
+  @doc since: "0.6.0"
+  @spec format(expression, keyword) :: String.t()
+  def format(expression, opts \\ []) do
+    width = opts |> Keyword.validate!(width: :infinity) |> fetch_format_width!()
+
+    expression
+    |> format_doc()
+    |> Algebra.format(width)
+    |> IO.iodata_to_binary()
+  end
+
+  defp format_doc(%AllOf{children: []}), do: "(true)"
+  defp format_doc(%AnyOf{children: []}), do: "(false)"
+  defp format_doc(%AllOf{children: children}), do: format_group(children, "and")
+  defp format_doc(%AnyOf{children: children}), do: format_group(children, "or")
+
+  defp format_doc(%Not{expression: expression}) do
+    Algebra.concat(["(not ", format_doc(expression), ")"])
+  end
+
+  defp format_doc(%Check{module: module, fun: fun, args: args}) do
+    "#{inspect(module)}.#{fun}(#{Enum.map_join(args, ", ", &format_arg/1)})"
+  end
+
+  defp format_doc(%Literal{satisfied?: satisfied?}), do: inspect(satisfied?)
+
+  defp format_group(children, operator) do
+    joined =
+      children
+      |> Enum.map(&format_doc/1)
+      |> Enum.reduce(
+        &Algebra.glue(&2, " ", Algebra.concat(operator <> " ", &1))
+      )
+
+    body = Algebra.nest(Algebra.concat(Algebra.break(""), joined), 2)
+    Algebra.group(Algebra.concat(["(", body, Algebra.break(""), ")"]))
+  end
+
+  defp format_arg(:ctx), do: "ctx"
+  defp format_arg({:ctx, key}) when is_atom(key), do: "ctx." <> to_string(key)
+  defp format_arg(arg), do: inspect(arg)
+
+  defp fetch_format_width!(opts) do
+    case Keyword.fetch!(opts, :width) do
+      :infinity ->
+        :infinity
+
+      width when is_integer(width) and width >= 0 ->
+        width
+
+      other ->
+        raise ArgumentError, """
+        invalid :width option in Spek.format/2
+
+        Expected a non-negative integer or :infinity.
+
+        Got:
+
+            #{inspect(other)}
+        """
+    end
   end
 
   ## Evaluation
