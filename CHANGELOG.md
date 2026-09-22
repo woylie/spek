@@ -8,6 +8,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Add `Spek.format/1` and `Spek.format/2`.
+
 ## [0.5.0] - 2026-08-26
 
 ### Added
