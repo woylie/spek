@@ -21,10 +21,6 @@ I'm open to feature requests, whether you intend to work on the implementation
 yourself or not. It is always helpful to hear how you use a project and where
 it falls short.
 
-### API improvements
-
-If you think the API can be improved in any way, please open an issue.
-
 ### Pull requests
 
 Pull requests are generally appreciated. If you plan to add a new feature or
@@ -37,8 +33,7 @@ instructions.
 Please make sure to:
 
 - Run the linters, format checkers, tests and static analysis tools of the
-  project locally before you push. You can run everything at once with
-  `mix precommit`.
+  project locally before you push.
 - Add tests that cover your changes. In the case of bug fixes, add a test that
   fails without the fix and that passes with the fix.
 - Document new and updated features (preferably with examples, if applicable).
@@ -78,4 +73,4 @@ language to English. Please mark such texts as machine-translated.
 ## Code of Conduct
 
 By participating, you are expected to uphold the
-[code of conduct](CODE_OF_CONDUCT.md).
+[code of conduct](https://github.com/woylie/.github/blob/main/CODE_OF_CONDUCT.md).
